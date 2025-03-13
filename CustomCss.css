@@ -1,0 +1,709 @@
+﻿@font-face {
+    font-family: 'BNAZANIN';
+    src: url('/fonts/BNAZANIN.TTF') format('truetype');
+}
+
+html, body {
+    font-family: 'BNAZANIN' !important;
+    font-weight: bolder !important;
+}
+:root {
+    --custom-purple: #9c27b0;
+    --custom-blue: #2196f3;
+    --custom-red: #f44336;
+    --custom-green: #4caf50;
+    --custom-lightGray: #526D82
+}
+/* wwwroot/css/site.css */
+
+
+
+/*DatePicker css*/
+/* Date Picker */
+
+
+.custom-control {
+    font-size: 16px !important;
+    color: #333 !important;
+    border-radius: 8px !important;
+    /* padding: 12px; */
+    /* margin-top: 10px; */
+}
+
+.date-picker {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    height: 60px;
+    background-color: #FFF;
+    margin: 30px auto;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    user-select: none;
+    border-radius: 7px;
+}
+
+    .date-picker:hover {
+        background-color: #F3F3F3;
+    }
+
+.selected-date {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #313131;
+    font-size: 28px;
+}
+
+.modalbox {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9000;
+    display: none;
+/*    font-family: IRANSans !important;*/
+}
+
+    .modalbox.active {
+        display: block;
+    }
+
+.dates {
+    position: relative;
+    width: 320px;
+    margin: 15% auto;
+    background-color: #FFF;
+    border-radius: 7px;
+    box-shadow: 0px 0px 15px #aaa;
+}
+
+    .dates .month {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 7px 7px 0px 0px;
+/*        background: #ca35dc;*/
+        background: #e58600;
+        color: #fff;
+    }
+
+.ShowBtn {
+    width: 27px;
+    height: 27px;
+    display: flex;
+    margin: 0px;
+    justify-content: center;
+    align-items: center;
+}
+
+.dates .month .arrows {
+    width: 45px;
+    height: 45px;
+    display: flex;
+    margin: 10px;
+    border-radius: 50%;
+    background: #fff;
+    justify-content: center;
+    align-items: center;
+    color: #313131;
+    font-size: 20px;
+    transition: all linear 0.05s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+}
+
+    .dates .month .arrows:hover .arrow {
+        filter: invert(1) brightness(0.3);
+    }
+
+    .dates .month .arrows:hover {
+        background-color: #f9f9f9;
+    }
+
+    .dates .month .arrows:active {
+        transform: scale(1.1);
+    }
+
+.dates .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    height: 200px;
+    margin: 10px;
+    direction: rtl;
+    cursor:pointer;
+}
+
+    .dates .days .day:hover {
+        background: #6eb2ff;
+        color: #fff;
+    }
+
+    .dates .days .day {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 50%;
+        margin-left: 3px;
+        margin-right: 3px;
+        overflow: hidden;
+        margin-bottom: 3px;
+        color: #313131;
+        transition: all linear 0.1s;
+        -webkit-transition: all linear 0.1s;
+        -moz-transition: all linear 0.1s;
+        -o-transition: all linear 0.1s;
+    }
+
+        .dates .days .day.selected {
+            /*background-color: #00CA85;*/
+            background-color: #a93a76;
+        }
+
+.mth {
+    direction: rtl !important;
+    cursor:pointer;
+}
+
+.selected-day {
+/*    background-color: #ff6eb4 !important;*/
+    background-color: #e58600 !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 88%;
+    margin-left: 4px;
+}
+
+.selected-other {
+    background-color: #6E74FF !important;
+    color: white !important;
+    border-radius: 7px !important;
+    width: 88%;
+    margin-left: 4px;
+}
+
+.buttons {
+    position: relative;
+    width: 100%;
+    height: 58px;
+    padding: 10px;
+    cursor:pointer;
+}
+
+.btns:hover {
+    background: #0CA940;
+    color: #fff;
+}
+
+.btns {
+    position: relative;
+    float: right;
+    height: 100%;
+    width: fit-content;
+    border-radius: 30px;
+    background: #EEE;
+    line-height: 36px;
+    padding-left: 30px;
+    padding-right: 30px;
+    margin-left: 15px;
+    font-size: 14px;
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.arrow {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    filter: invert(1) brightness(0.5);
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.ym:hover {
+    background: #fff;
+    color: #606060;
+}
+
+.ym {
+    position: relative;
+    height: fit-content;
+    width: fit-content;
+    padding: 1px 7px;
+    border-radius: 7px;
+    margin-left: 5px;
+    border: 2px solid #fff;
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.years-cont,
+.months-cont {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    border-radius: 7px;
+    background: #ffff;
+    top: 0;
+    right: 0;
+    display: none;
+}
+
+.y-m-btns-cont {
+    position: relative;
+    width: 100%;
+    border-radius: 7px 7px 0px 0px;
+    height: 65px;
+    padding-left: 10px;
+    padding-right: 10px;
+/*    background: #ca35dc;*/
+    background: #e58600;
+}
+
+.y-holder {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: 240px;
+    margin: 10px;
+    direction: rtl;
+}
+
+.m-holder {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    height: 230px;
+    margin: 10px;
+    direction: rtl;
+}
+
+.the-m:hover {
+    background: #6eb2ff;
+    color: #fff;
+}
+
+.the-m {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 6px;
+    margin-left: 3px;
+    margin-right: 3px;
+    margin-bottom: 3px;
+    color: #313131;
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.pull-left {
+    float: left;
+}
+
+.pull-right {
+    float: right;
+}
+
+.lr-btns:hover img {
+    filter: invert(1) brightness(1);
+}
+
+.lr-btns:hover {
+    background: #6eb2ff;
+}
+
+.lr-btns {
+    position: relative;
+    margin-top: 13px;
+    border-radius: 50%;
+    height: 40px;
+    width: 40px;
+    background: #fff;
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+}
+
+.cancel-cont {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.cancel-btn:hover {
+    background: #0CA940;
+    color: #fff;
+}
+
+.cancel-btn {
+    position: relative;
+    padding: 7px 12px;
+    width: fit-content;
+    margin: 0 auto;
+    border-radius: 7px;
+    margin-top: 13px;
+    background: #FFF;
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.year-arrow {
+    position: relative;
+    width: 20px;
+    margin-top: 10px;
+    margin-right: 10px;
+    height: 20px;
+    filter: invert(1) brightness(0.5);
+    transition: all linear 0.1s;
+    -webkit-transition: all linear 0.1s;
+    -moz-transition: all linear 0.1s;
+    -o-transition: all linear 0.1s;
+    cursor:pointer;
+}
+
+.years-select-active {
+    display: block;
+}
+
+.months-select-active {
+    display: block;
+}
+
+.disable-day {
+    color: #b3b3b3 !important;
+}
+
+
+/*DatePicker css*/
+
+
+
+
+
+
+
+
+
+
+
+
+/* Custom Scrollbar Design - Applies to all elements */
+/* Global Scrollbar (except for elements with .custom-scrollbar) */
+*:not(.custom-scrollbar)::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+    background-color: #f5f5f5;
+}
+
+*:not(.custom-scrollbar)::-webkit-scrollbar-track {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.05);
+}
+
+*:not(.custom-scrollbar)::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 8px;
+    border: 3px solid #ffffff;
+    transition: background 0.3s ease;
+}
+
+    *:not(.custom-scrollbar)::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+/* For Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #ffffff;
+}
+
+
+
+
+
+/* Loading Progress*/
+
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    margin: 20vh auto 1rem auto;
+}
+
+    .loading-progress circle {
+        fill: none;
+        stroke: #e0e0e0;
+        stroke-width: 0.6rem;
+        transform-origin: 50% 50%;
+        transform: rotate(-90deg);
+    }
+
+        .loading-progress circle:last-child {
+            stroke: #1b6ec2;
+            stroke-dasharray: calc(3.142 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+            transition: stroke-dasharray 0.05s ease-in-out;
+        }
+
+.loading-progress-text {
+    position: relative;
+    text-align: center;
+    font-weight: bold;
+    top: -90px;
+}
+
+    .loading-progress-text:after {
+        content: var(--blazor-load-percentage-text, "در حال بارگیری");
+    }
+
+code {
+    color: #c02d76;
+}
+
+/*End Loading Progress*/
+
+
+
+
+button:disabled, select:disabled {
+    background-color: #F3F4F6 !important; /* Custom gray (gray-500) */
+    color: #A1A1AA !important; /* Custom text color (gray-300) */
+    cursor: not-allowed !important;
+    opacity: 0.5 !important;
+    border-color: #E5E7EB !important;
+}
+
+
+.custom-scrollbar::-webkit-scrollbar {
+    height: 8px !important; /* Ensures height applies */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #3f4041 !important; /* Background color */
+    border-radius: 10px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: white !important;
+    border-radius: 10px !important;
+    opacity: 0.7 !important;
+    transition: box-shadow 0.5s ease-in-out, opacity 0.5s ease-in-out !important;
+}
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #b9b4b4 !important;
+        opacity: 1 !important;
+        box-shadow: 0px 0px 10px rgba(185, 180, 180, 0.7) !important; /* Subtle glow effect */
+    }
+
+
+.bi::before {
+    vertical-align: middle !important;
+}
+
+.Card-BackgroundColor {
+    background-color: var(--custom-lightGray) !important
+}
+
+.shadow-elevation-0 {
+    box-shadow: none;
+}
+
+.shadow-elevation-1 {
+    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.shadow-elevation-2 {
+    box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.16), 0px 3px 6px rgba(0, 0, 0, 0.23);
+}
+
+.shadow-elevation-3 {
+    box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.19), 0px 6px 6px rgba(0, 0, 0, 0.23);
+}
+
+.shadow-elevation-4 {
+    box-shadow: 0px 14px 28px rgba(0, 0, 0, 0.25), 0px 10px 10px rgba(0, 0, 0, 0.22);
+}
+
+.shadow-elevation-5 {
+    box-shadow: 0px 19px 38px rgba(0, 0, 0, 0.3), 0px 15px 12px rgba(0, 0, 0, 0.22);
+}
+
+
+
+
+
+/* wwwroot/css/site.css */
+
+
+/* wwwroot/css/site.css */
+.custom-table {
+    border-radius: 20px !important;
+    background-color: #fbede4 !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+    .custom-table th {
+        color: black;
+        text-align: center;
+        margin: 0 auto;
+        font-size: 1.1em;
+        font-weight: bold;
+    }
+
+    .custom-table td {
+        padding: 120px 20px;
+        text-align: center;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    .custom-table tr:nth-child(odd) {
+        background-color: #f9fafc;
+        padding: 1px;
+    }
+
+    .custom-table tr:nth-child(even) {
+        background-color: #e9ecef;
+        padding: 1px;
+    }
+
+    .custom-table tr:hover {
+        background-color: #f1f1f1;
+        background-color: #fbede4;
+    }
+
+    .custom-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .custom-table .pagination {
+        margin-top: 20px;
+        justify-content: center;
+        display: flex;
+        gap: 10px;
+    }
+
+        .custom-table .pagination .page-item {
+            border-radius: 5px;
+        }
+
+        .custom-table .pagination .page-link {
+            background-color: #3498db;
+            color: white;
+            border-radius: 5px;
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+
+            .custom-table .pagination .page-link:hover {
+                background-color: #2980b9;
+            }
+
+
+/* Cards for dashboard*/
+
+/* Your custom CSS */
+
+
+
+.dash-card {
+    transition: all 0.3s ease;
+    background: linear-gradient(145deg, #334155, #0f172a);
+    color: #f8fafc; /* slate-50 for text */
+    overflow: hidden; /* New */
+    border: 1px solid transparent; /* Initial transparent border */
+}
+
+.dash-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: linear-gradient(145deg, #334155, #0f172a);
+    color: #f8fafc;
+    position: relative;
+    overflow: hidden;
+}
+
+
+    .dash-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 1rem 3rem rgba(0,0,0,0.1);
+        cursor: pointer;
+    }
+
+.icon-container {
+    width: 60px;
+    height: 60px;
+    transition: transform 0.3s ease;
+}
+
+.dash-card:hover .icon-container {
+    transform: rotate(15deg);
+}
+
+.icon-container-currency {
+    width: 60px;
+    height: 60px;
+    transition: transform 0.7s ease;
+}
+
+.dash-card:hover .icon-container-currency {
+    transform: scale(1.3);
+}
+
+
+.wave-overlay {
+    position: absolute;
+    bottom: -30px;
+    height: 60px;
+    width: calc(100% + 20px); /* Adjusted */
+    margin-left: -10px; /* Instead of left: -10px */
+    margin-right: -10px; /* Instead of right: -10px */
+    background: linear-gradient(90deg, transparent 40%, white /* slate-50 with opacity */
+    70%, transparent 20% );
+    opacity: 0.1;
+    transform: rotate(-2deg);
+}
+
+
+.dash-card:hover .wave-overlay {
+    animation: wave 2.5s linear infinite;
+}
+
+@keyframes wave {
+    0% {
+        transform: translateX(-100%) rotate(-2deg);
+    }
+
+    100% {
+        transform: translateX(calc(100% + 20px)) rotate(-2deg);
+    }
+}
+
+.text-gradient {
+    background: linear-gradient(45deg, #818cf8 /* indigo-400 */, #c7d2fe /* indigo-100 */ );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
