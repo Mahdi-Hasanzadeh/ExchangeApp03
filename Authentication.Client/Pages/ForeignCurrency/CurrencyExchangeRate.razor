@@ -1,0 +1,468 @@
+﻿@page "/currency/exchangeRate"
+@using Shared.DTOs.CurrencyDTOs
+@using System.Net.Http.Headers
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+<PageTitle>نرخ ارزها</PageTitle>
+
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <CustomToast />
+            @if (_initialLoading)
+            {
+                <LoadingProgress />
+            }
+            else
+            {
+                <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-lg p-4">
+                    @if (_loadingCurrenciesDetail)
+                    {
+                        <h1 class="text-2xl font-bold text-center mb-4">در حال بارگذاری اطلاعات...</h1>
+                    }
+
+                    else if (_currenciesList.Count == 0)
+                    {
+                        <div class="flex flex-col justify-center items-center">
+
+                            <h2 class="text-2xl font-bold text-center mb-4">شما هیچ ارزی در سیستم ندارید.برای اضافه کردن روی دکمه کلیک کنید.</h2>
+
+                            <MdInfoButton ButtonType="button" Content="اضافه کردن ارز" OnClick="NavigateToAddCurrency" />
+                        </div>
+                    }
+
+                    else
+                    {
+                        <h2 class="text-2xl font-bold text-center mb-4">نرخ تبادله ارزها</h2>
+
+                        <h4 class="text-2xl font-bold text-center mb-2">ارز پایه: @_selectedBaseCurrencyName</h4>
+                        <h4 class="text-center mb-4">واحد ارز: @_selectedBaseCurrencyUnit.ToThreeDigitFormatWithoutPointPersian()</h4>
+                        <div class="space-y-4">
+                            @foreach (var (item, index) in _currencyDetailList.Select((value, i) => (value, i)))
+                            {
+                                <EditForm Model="@item"
+                                          OnValidSubmit="() => UpdateRate(item)"
+                                          Enhance
+                                          class="@string.Join(" ", "flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-2 px-2", index == 0 ? "shadow-lg py-4 mb-[4rem]" : "")">
+                                    <!-- Left Section (Image & Name) -->
+                                    <DataAnnotationsValidator />
+                                    <div class="flex items-center gap-3">
+                                        @if (index != 0)
+                                        {
+                                            <img src="@item.ImageString" class="w-6 h-4" alt="@item.Name">
+                                        }
+                                        <div class="font-medium text-2xl">@(index == 0 ? "" : item.Name)</div>
+
+                                        @if (index == 0)
+                                        {
+                                            <div class="relative">
+                                                <button type="button" @onclick="ToggleDropdown"
+                                                        class="w-full border rounded-lg p-2 px-4 flex items-center justify-between gap-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                                    @if (_currenciesList.Any(c => c.CurrencyId == SelectedBaseCurrencyId))
+                                                    {
+                                                        var selectedCurrency = _currenciesList.First(c => c.CurrencyId == SelectedBaseCurrencyId);
+                                                        <img src="@selectedCurrency.Image.ConvertByteArrayToImage()" class="w-6 h-6 mr-2" />
+                                                        @selectedCurrency.Name
+                                                    }
+                                                    <span>▼</span>
+                                                </button>
+
+                                                @if (IsDropdownOpen)
+                                                {
+                                                    <ul class="absolute z-10 w-full bg-white border rounded-lg shadow-lg mt-1">
+                                                        @foreach (var currency in _currenciesList)
+                                                        {
+                                                            <li @onclick="() => SelectCurrency(currency.CurrencyId)"
+                                                                class="flex items-center p-2 hover:bg-gray-200 cursor-pointer">
+                                                                <img src="@currency.Image.ConvertByteArrayToImage()" class="w-6 h-6 mr-2 ml-2" />
+                                                                @currency.Name
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                }
+                                            </div>
+                                        }
+
+
+                                    </div>
+
+                                    <!-- Right Section (Controls) -->
+                                    <div class="w-full md:w-auto">
+                                        <div class="flex flex-col md:flex-row gap-3 md:items-center">
+                                            <!-- Buy/Sell Groups -->
+                                            <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                                                <!-- Buy Section -->
+                                                <div class="flex flex-col md:flex-row md:items-center gap-2">
+                                                    <button type="button"
+                                                            class="bg-white text-green-500 border border-green-500 px-3 py-1 rounded
+                                  hover:bg-green-500 hover:text-white transition-colors">
+                                                        خرید
+                                                    </button>
+                                                    <InputNumber TValue="decimal?"
+                                                                 class="border border-gray-300 rounded-sm px-2 py-1 w-full md:w-32
+                           focus:outline-none focus:ring-0 appearance-none"
+                                                                 placeholder="مقدار خرید را وارد کنید"
+                                                                 @bind-Value="@item.BuyValue" />
+                                                    <ValidationMessage For="() => item.BuyValue" class="text-red-500 text-sm" />
+                                                </div>
+
+                                                <!-- Sell Section -->
+                                                <div class="flex flex-col md:flex-row md:items-center gap-2">
+                                                    <button type="button"
+                                                            class="bg-white text-red-500 border border-red-500 px-3 py-1 rounded
+                                  hover:bg-red-500 hover:text-white transition-colors">
+                                                        فروش
+                                                    </button>
+                                                    <InputNumber TValue="decimal?"
+                                                                 class="border border-gray-300 rounded-sm px-2 py-1 w-full md:w-32
+                           focus:outline-none focus:ring-0 appearance-none"
+                                                                 @bind-Value="item.SellValue" />
+                                                    <ValidationMessage For="() => item.SellValue" class="text-red-500 text-sm" />
+
+                                                </div>
+                                            </div>
+
+                                            <!-- Action Buttons -->
+                                            <div class="flex flex-col md:flex-row gap-2">
+                                                <InfoButton IsDisabled="@_isDisabled" ButtonType="submit" Content="بروز رسانی" />
+                                                <DangerButton IsDisabled="@_isDisabled" ButtonType="submit" Content="انصراف" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </EditForm>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+@code {
+
+    #region Private Fields
+
+    private int _selectedBaseCurrencyId { get; set; }
+
+    private int SelectedBaseCurrencyId
+    {
+        get => _selectedBaseCurrencyId;
+        set
+        {
+            if (_selectedBaseCurrencyId != value)
+            {
+                _selectedBaseCurrencyId = value;
+
+                InvokeAsync(async () =>
+                {
+                    await FetchCurrencyDetail();
+                    HandleBaseCurrencyChange();
+                    await InvokeAsync(StateHasChanged); // Only trigger UI refresh once
+                });
+            }
+        }
+    }
+
+
+    private string _selectedBaseCurrencyName { get; set; }
+
+    private int _selectedBaseCurrencyUnit { get; set; }
+
+    private List<CurrencyDTO> _currenciesList { get; set; } = new List<CurrencyDTO>();
+
+    private EditContext _editContext;
+
+    [SupplyParameterFromForm]
+    private List<CurrencyDetailDTO> _currencyDetailList { get; set; }
+
+    private bool _loadingCurrenciesDetail { get; set; } = false;
+
+    private ValidationMessageStore _messageStore = new ValidationMessageStore(new EditContext(new object()));
+
+    private Dictionary<int, CurrencyDetailDTO> _originalCurrencyDetailMap { get; set; } = new();
+    // private List<CurrencyDetailDTO> _originalCurrencyDetailList { get; set; } = new();
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private bool _isDisabled { get; set; }
+
+    private bool _initialLoading { get; set; }
+
+    #endregion
+
+    #region Private Methods
+
+    private bool IsDropdownOpen = false;
+
+    void ToggleDropdown()
+    {
+        IsDropdownOpen = !IsDropdownOpen;
+    }
+
+    void SelectCurrency(int currencyId)
+    {
+        SelectedBaseCurrencyId = currencyId;
+        IsDropdownOpen = false;
+    }
+
+    private async Task UpdateRate(CurrencyDetailDTO currencyDetailDTO)
+    {
+        if (currencyDetailDTO.SellValue == 0 || currencyDetailDTO.BuyValue == 0)
+        {
+            toastService.ShowError("مقدار خرید یا فروش نمی تواند صفر باشد.");
+            return;
+        }
+
+        try
+        {
+            _isDisabled = true;
+
+            // var authenticatedUser = await _state;
+            // if (!authenticatedUser.User.Identity.IsAuthenticated)
+            // {
+            //     toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            //     return;
+            // }
+
+            // var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+
+            currencyDetailDTO.BaseCurrencyId = _selectedBaseCurrencyId;
+            currencyDetailDTO.UserId = _userId;
+            currencyDetailDTO.Unit = _selectedBaseCurrencyUnit;
+
+            var currencyExchangeRateDTO = currencyDetailDTO.ToCurrencyExchangeRateDTO();
+
+            var result = await SendCurrencyRateRequestAsync(currencyDetailDTO.CurrencyExchangeRateId, currencyExchangeRateDTO);
+
+            if (result != null && result.Success)
+            {
+                toastService.ShowSuccess("نرخ ارز بروز رسانی شد.");
+                currencyDetailDTO.CurrencyExchangeRateId = result.Data;
+
+                var originalItem = _originalCurrencyDetailMap.TryGetValue(currencyDetailDTO.TargetCurrencyId, out var value) ? value : null;
+                originalItem!.SellValue = currencyDetailDTO.SellValue;
+                originalItem.BuyValue = currencyDetailDTO.BuyValue;
+                StateHasChanged();
+            }
+            else
+            {
+                toastService.ShowError(result?.Message ?? Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private async Task<ApiResponse<int>> SendCurrencyRateRequestAsync(int currencyExchangeRateId, CurrencyExchangeRateDTO currencyExchangeRateDTO)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
+        var url = currencyExchangeRateId == 0 ? "api/Currency/currencyRate" : $"api/Currency/currencyRate/{currencyExchangeRateId}";
+        var response = currencyExchangeRateId == 0
+            ? await _httpClient.PostAsJsonAsync(url, currencyExchangeRateDTO)
+            : await _httpClient.PutAsJsonAsync(url, currencyExchangeRateDTO);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+        }
+        return null;
+    }
+
+    private async Task FetchCurrencyDetail()
+    {
+        try
+        {
+            // Fetch All currency Details
+            //TODO: Get baseCurrencyId from User Preference
+            int baseCurrencyId = _selectedBaseCurrencyId;
+
+            string url = $"api/Currency/currencyDetail/{baseCurrencyId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDetailDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            foreach (var item in response.Data)
+            {
+                item.ImageString = item.Image.Length > 0 ?
+                item.Image.ConvertByteArrayToImage() : string.Empty;
+            }
+            _currencyDetailList = new();
+            _currencyDetailList.Add(response.Data.FirstOrDefault(c => c.TargetCurrencyId == baseCurrencyId));
+
+            // var filteredCurrencyList = _currenciesList.Where()
+            var filteredList = response.Data.Where(c => c.TargetCurrencyId != baseCurrencyId).ToList();
+            _currencyDetailList.AddRange(filteredList);
+
+            _originalCurrencyDetailMap = response.Data.ToDictionary(
+                     item => item.TargetCurrencyId,
+                     item => new CurrencyDetailDTO
+                         {
+                             TargetCurrencyId = item.TargetCurrencyId,
+                             CurrencyExchangeRateId = item.CurrencyExchangeRateId,
+                             BuyValue = item.BuyValue,
+                             SellValue = item.SellValue,
+                         });
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private void ResetForm(CurrencyDetailDTO item)
+    {
+        // Clear the validation messages for this item
+        // _messageStore.Clear();
+        // var originalItem = _originalCurrencyDetailMap.TryGetValue(item.TargetCurrencyId, out var value) ? value : null;
+        // if (originalItem != null)
+        // {
+        //     item.BuyValue = originalItem.BuyValue;
+        //     item.SellValue = originalItem.SellValue;
+        // }
+        // JS.InvokeVoidAsync("alert", "resetted");
+        // StateHasChanged();
+
+        _messageStore.Clear();
+        var originalItem = _originalCurrencyDetailMap.TryGetValue(item.TargetCurrencyId, out var value) ? value : null;
+
+        // var originalItem = _originalCurrencyDetailList
+        //     .FirstOrDefault(x => x.TargetCurrencyId == item.TargetCurrencyId);
+
+        if (originalItem != null)
+        {
+            var index = _currencyDetailList.IndexOf(item);
+            var currency = _currencyDetailList[index];
+
+
+
+            item.BuyValue = originalItem.BuyValue;
+            item.SellValue = originalItem.SellValue;
+
+        }
+        StateHasChanged();
+    }
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _loadingCurrenciesDetail = true;
+            // Fetch All currencies
+
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToList();
+
+            if (_currenciesList.Count == 0)
+            {
+                toastService.ShowInfo("شما هیچ ارزی در حساب تان ندارید. لطفا ارز های مورد نظر را اضافه کنید.");
+                return;
+            }
+            //TODO: Get this value for userPereference
+            // it show when the page is loading, which currency should be
+            //selected in the InputSelect
+            // check if the value is null, so choose one currency automatically
+            int userPereferenceBaseCurrency = 1;
+            var curreny = _currenciesList.FirstOrDefault(c => c.CurrencyId == userPereferenceBaseCurrency)!;
+            _selectedBaseCurrencyId = _currenciesList[0].CurrencyId;
+            // _selectedBaseCurrencyId = curreny.CurrencyId;
+            HandleBaseCurrencyChange();
+
+            await FetchCurrencyDetail();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingCurrenciesDetail = false;
+        }
+    }
+
+    private void HandleBaseCurrencyChange()
+    {
+        var currency = _currenciesList.FirstOrDefault(c => c.CurrencyId == _selectedBaseCurrencyId);
+        _selectedBaseCurrencyName = currency?.Name ?? "";
+        _selectedBaseCurrencyUnit = currency?.Unit ?? 0;
+    }
+
+    private void NavigateToAddCurrency()
+    {
+        Navigation.NavigateTo("/currency/addOrEdit");
+    }
+    #endregion
+
+    #region Life Cycles
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                _initialLoading = false; // Set this early
+                StateHasChanged(); // Force UI update
+                return;
+            }
+
+            _jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            await FetchCurrencies();
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("بارگیری اطلاعات به مشکل مواجه شد.");
+            Console.WriteLine($"Error initializing: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+}

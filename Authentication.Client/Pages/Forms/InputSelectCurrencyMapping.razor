@@ -1,0 +1,55 @@
+﻿@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+@if (!_loading && CurrencyList is not null && CurrencyList.Count != 0)
+{
+    <InputSelect disabled="@isDisabled" @bind-Value="selectedCurrency"
+                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="0" selected>@FirstOption</option>
+        @foreach (var currency in CurrencyList.Values)
+        {
+            <option @key="currency.CurrencyId" value="@currency.CurrencyId">@currency.Name</option>
+        }
+    </InputSelect>
+}
+
+@code {
+    private bool _loading = false;
+
+    [Parameter]
+    public string FirstOption { get; set; } = "ارز را انتخاب کنید.";
+
+    [Parameter]
+    public bool isDisabled { get; set; } = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    // ✅ Two-way binding support
+    [Parameter]
+    public int BindValueTo { get; set; }
+
+    [Parameter]
+    public EventCallback<int> BindValueToChanged { get; set; }
+
+    private int selectedCurrency
+    {
+        get => BindValueTo;
+        set
+        {
+            if (BindValueTo != value)
+            {
+                BindValueTo = value;
+                BindValueToChanged.InvokeAsync(value); // Notify parent component
+            }
+        }
+    }
+
+    [Parameter]
+    public Dictionary<int, CurrencyDTO> CurrencyList { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // selectedCurrency = BindValueTo;
+    }
+}

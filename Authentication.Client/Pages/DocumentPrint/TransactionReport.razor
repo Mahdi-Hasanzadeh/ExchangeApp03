@@ -1,0 +1,51 @@
+﻿@inject IJSRuntime JS
+
+<h3>Customer Transactions</h3>
+
+<button @onclick="PrintReport">Print Transactions</button>
+
+<div id="reportContent">
+    <h4>Customer: John Doe</h4>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Currency</th>
+                <th>Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var transaction in Transactions)
+            {
+                <tr>
+                    <td>@transaction.Date.ToString("yyyy-MM-dd")</td>
+                    <td>@transaction.Amount</td>
+                    <td>@transaction.Currency</td>
+                    <td>@transaction.Type</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Transaction> Transactions = new List<Transaction>
+    {
+        new Transaction { Date = DateTime.Now, Amount = 500, Currency = "USD", Type = "Deposit" },
+        new Transaction { Date = DateTime.Now, Amount = -200, Currency = "USD", Type = "Withdrawal" }
+    };
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("printDiv", "reportContent");
+    }
+
+    public class Transaction
+    {
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+}

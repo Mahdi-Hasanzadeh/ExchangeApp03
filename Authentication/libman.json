@@ -1,0 +1,15 @@
+{
+  "version": "3.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "library": "bootstrap-icons@1.11.3",
+      "destination": "wwwroot/bootstrap-icons/"
+    },
+    {
+      "provider": "unpkg",
+      "library": "tailwindcss@3.4.17",
+      "destination": "wwwroot/tailwindcss/"
+    }
+  ]
+}

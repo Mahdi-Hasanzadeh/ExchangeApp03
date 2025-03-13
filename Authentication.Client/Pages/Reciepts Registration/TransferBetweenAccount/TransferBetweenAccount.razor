@@ -1,0 +1,1028 @@
+﻿@page "/RecieptsRegistration/TransferBetweenAccount"
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+@inject IJSRuntime JS
+@using Authentication.Client.Pages.DocumentPrint
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.TransactionsDTOs
+@implements IDisposable
+
+
+<PageTitle>انتقال بین حسابات</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <Modal @ref="modalRef"
+                   ConfirmationMessage="آیا از حذف این مورد مطمئن هستید؟"
+                   SubmitButtonText="حذف"
+                   OnConfirm="DeleteItem" />
+            <CustomToast />
+
+            @if (_initialLoading)
+            {
+                <LoadingWithImage />
+            }
+            else
+            {
+                if (_currenciesList.Count > 0)
+                {
+                    <CustomerBalanceCard CurrenciesList="_currenciesList"
+                                         CustomerId="@SelectedSenderId"
+                                         @ref="customerBalanceCard"
+                                         @key="SelectedSenderId"
+                                         _currencyExchangeRate="_currencyExchangeRate" />
+                }
+
+                <div class="container mx-auto md:px-3">
+                    @* Transfer Form *@
+
+                    @if (_initialLoading)
+                    {
+                        <LoadingTitle Content="بارگیری اطلاعات..." />
+                    }
+                    else
+                    {
+                        <div class="shadow-md px-3 py-3 rounded-2xl w-full">
+                            <h5 class="text-slate-900 text-2xl">@(_updateMode ? "فورم انتقال بین حسابات(ویرایش)" : "فورم انتقال بین حسابات")</h5>
+                            <hr class="relative mt-1 mb-2 z-0 opacity-75 border-slate-500">
+
+                            <EditForm Enhance Model="@_transferBetweenAccountDTO"
+                                      OnValidSubmit="HandleFormSubmit"
+                                      FormName="TransferForm">
+                                <DataAnnotationsValidator />
+
+                                <div class="flex flex-col gap-6 lg:flex-row">
+                                    <!-- Sender Section -->
+                                    <div class="flex-1">
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <h2 class="text-slate-900 text-lg font-semibold">اطلاعات فرستنده</h2>
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                                                <div>
+                                                    <Label Content="شماره حساب فرستنده" />
+                                                    <InputSelectCustomerMapping IsDisabled="@_isGridDisabled" CustomerList="_cutomersInfoList"
+                                                                                @bind-BindValueTo="SelectedSenderId" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.SenderId" class="text-red-500 text-sm" />
+                                                </div>
+                                                <div>
+                                                    <Label Content="مبلغ پول" />
+                                                    <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                                                 @bind-Value="_transferBetweenAccountDTO.SendedAmount"
+                                                                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                                 @oninput="UpdateAmount" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.SendedAmount" class="text-red-500 text-sm" />
+                                                    @if (_transferBetweenAccountDTO.SendedAmount >= 0)
+                                                    {
+                                                        <strong>به حروف:</strong> @_amountInWords
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <Label Content="ارز" />
+                                                    <InputSelectCurrencyMapping CurrencyList="_currenciesList"
+                                                                                @bind-BindValueTo="_transferBetweenAccountDTO.CurrencyId" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.CurrencyId"
+                                                                       class="text-red-500 text-sm" />
+                                                </div>
+                                                <div>
+                                                    <Label Content="تاریخ" />
+                                                    <DateInput @bind-BindValueTo="_transferBetweenAccountDTO.CreatedDate" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.CreatedDate" class="text-red-500 text-sm" />
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                                                <div class="mb-2  col-span-2">
+                                                    <Label Content="نوت" />
+                                                    <InputText @bind-Value="_transferBetweenAccountDTO.SendBy"
+                                                               class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.SendBy" class="text-red-500 text-sm" />
+                                                </div>
+                                                <div class="col-span-3">
+                                                    <Label Content="تفصیلات" />
+                                                    <InputTextArea @bind-Value="_transferBetweenAccountDTO.SenderDescription"
+                                                                   class="w-full h-11 border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                    <ValidationMessage For="() => _transferBetweenAccountDTO.SenderDescription" class="text-red-500 text-sm" />
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                    <!-- Divider for larger screens -->
+                                    <div class="hidden md:block w-[1px] bg-gray-300"></div>
+
+                                    <!-- Receiver Section -->
+                                    <div class="flex-1">
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <h2 class="text-slate-900 text-lg font-semibold">اطلاعات گیرنده</h2>
+                                            <div>
+                                                <Label Content="شماره حساب گیرنده" />
+                                                <InputSelectCustomerMapping CustomerList="_cutomersInfoList"
+                                                                            @bind-BindValueTo="_transferBetweenAccountDTO.RecieverId"/>
+                                                <ValidationMessage For="() => _transferBetweenAccountDTO.RecieverId" class="text-red-500 text-sm" />
+                                            </div>
+                                            <div>
+                                                <Label Content="نوت" />
+                                                <InputText @bind-Value="_transferBetweenAccountDTO.RecievedBy"
+                                                           class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                <ValidationMessage For="() => _transferBetweenAccountDTO.RecievedBy" class="text-red-500 text-sm" />
+                                            </div>
+                                            <div>
+                                                <Label Content="تفصیلات" />
+                                                <InputTextArea @bind-Value="_transferBetweenAccountDTO.RecieverDescription"
+                                                               class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                <ValidationMessage For="() => _transferBetweenAccountDTO.RecieverDescription" class="text-red-500 text-sm" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="hidden md:block w-[1px] bg-gray-300"></div>
+
+                                    <!-- Commission Section -->
+                                    <div class="flex-1">
+                                        <h2 class="text-slate-900 text-lg font-semibold">اطلاعات کمشن</h2>
+                                        @* <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> *@
+                                            <div>
+                                                <Label Content="نوع کمشن" />
+                                                <div class="flex flex-wrap items-center gap-6">
+                                                    <InputRadioGroup @bind-Value="CommisionType" class="flex flex-wrap items-center gap-6 w-full">
+                                                        <label for="NoComission"
+                                                               class="flex items-center gap-2 cursor-pointer hover:bg-blue-100 px-4 py-2 rounded-lg transition duration-200">
+                                                            <InputRadio Value="CommisionType.NoComission"
+                                                                        class="form-radio text-blue-500 focus:ring-2 focus:ring-blue-400"
+                                                                        id="NoComission" />
+                                                            <span class="text-blue-700 font-medium">بدون کمشن</span>
+                                                        </label>
+                                                        <label for="Cash"
+                                                               class="flex items-center gap-2 cursor-pointer hover:bg-green-100 px-4 py-2 rounded-lg transition duration-200">
+                                                            <InputRadio Value="CommisionType.Cash"
+                                                                        class="form-radio text-green-500 focus:ring-2 focus:ring-green-400"
+                                                                        id="Cash" />
+                                                            <span class="text-green-700 font-medium">نقدی</span>
+                                                        </label>
+                                                        <label for="FromSender"
+                                                               class="flex items-center gap-2 cursor-pointer hover:bg-red-100 px-4 py-2 rounded-lg transition duration-200">
+                                                            <InputRadio Value="CommisionType.FromSender"
+                                                                        class="form-radio text-red-500 focus:ring-2 focus:ring-red-400"
+                                                                        id="FromSender" />
+                                                            <span class="text-red-700 font-medium">از حساب فرستنده</span>
+                                                        </label>
+                                                        <label for="FromReciever"
+                                                               class="flex items-center gap-2 cursor-pointer hover:bg-red-100 px-4 py-2 rounded-lg transition duration-200">
+                                                            <InputRadio Value="CommisionType.FromReciever"
+                                                                        class="form-radio text-red-500 focus:ring-2 focus:ring-red-400"
+                                                                        id="FromReciever" />
+                                                            <span class="text-red-700 font-medium">از حساب گیرنده</span>
+                                                        </label>
+                                                    </InputRadioGroup>
+                                                </div>
+
+                                                @if (CommisionType != CommisionType.NoComission)
+                                                {
+                                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
+                                                        <div>
+                                                            <Label Content="کارمزد" />
+                                                            <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                                                         @bind-Value="_transferBetweenAccountDTO.TransactionFeeAmount"
+                                                                         class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                                         @oninput="UpdateCommisionAmount" />
+                                                            <ValidationMessage For="() => _transferBetweenAccountDTO.TransactionFeeAmount" class="text-red-500 text-sm" />
+                                                            @if (_transferBetweenAccountDTO.TransactionFeeAmount >= 0)
+                                                            {
+                                                                <strong>به حروف:</strong> @_commisionAmountInWords
+                                                                @* @Expressions.CurrencyDictionary[_transferBetweenAccountDTO.CurrencyId] *@
+                                                            }
+                                                        </div>
+                                                        <div>
+                                                            <Label Content="شماره حساب گیرنده کمشن" />
+                                                            <InputSelectCustomerMapping CustomerList="_officeAccountList"
+                                                                                        @bind-BindValueTo="SelectedTransactionAccountId" />
+                                                            <ValidationMessage For="() => _transferBetweenAccountDTO.TransactionFeeAccountId"
+                                                                               class="text-red-500 text-sm" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="grid grid-cols-1">
+                                                        <Label Content="ارز" />
+                                                        <InputSelectCurrencyMapping isDisabled="@(CommisionType != CommisionType.Cash)" CurrencyList="_currenciesList"
+                                                                                    @bind-BindValueTo="_transferBetweenAccountDTO.CommisionCurrencyId" />
+                                                        <ValidationMessage For="() => _transferBetweenAccountDTO.CommisionCurrencyId"
+                                                                           class="text-red-500 text-sm" />
+                                                    </div>
+                                                }
+                                            </div>
+                                        @* </div> *@
+                                    </div>
+
+
+
+                                </div>
+                                <div class="flex flex-column gap-2 mt-4">
+                                    <MdSuccessButton IsDisabled="@_isDisabled" ButtonType="submit" Content="@(_updateMode ? "بروز رسانی" : "ثبت")" />
+                                    <MdInfoButton IsDisabled="@_isDisabled" ButtonType="submit" Content="@(_updateMode ? "بروز رسانی و چاپ" : "ثبت و چاپ")" />
+                                    <MdDangerButton IsDisabled="@_isDisabled" ButtonType="button" OnClick="ResetForm" Content="انصراف" />
+                                </div>
+
+                            </EditForm>
+
+                        </div>
+                    }
+
+                    @* Grid *@
+                    <div class="shadow-md px-5 py-4 rounded-2xl mx-auto mt-2">
+                        @if (_loadingCustomerTransactions)
+                        {
+                            <LoadingTitle Content="در حال بارگیری اطلاعات انتقال..." />
+                        }
+                        else if (_customerTransferSummary.Count == 0)
+                        {
+                            <LoadingTitle Content="هیچ تراکنش انتقالی وجود ندارد." />
+                        }
+                        else
+                        {
+                            <h5 class="text-2xl font-bold text-gray-800 mb-2">آخرین انتقالات: (@_selectedCustomerFullName)</h5>
+                            <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+                            <QuickGrid OverscanCount="5" Virtualize Class="w-full border-collapse table-auto custom-table" Items="_customerTransferSummary.AsQueryable()" Pagination="paginationState">
+                                <PropertyColumn Property="f => f.Id" Title="#" Sortable="true" />
+                                <PropertyColumn Property="f => f.SendedAmount.ToTwoDecimalPoints()" Title="مقدار" />
+                                <PropertyColumn Property="f => f.CurrencyName" Title="ارز" Sortable="true" />
+                                <PropertyColumn Property="f => f.SenderName" Title="از" />
+                                <PropertyColumn Property="f => f.RecieverName" Title="به" />
+                                <PropertyColumn Property="f => Expressions.CommisionDictionary[f.CommisionType]" Title="نوع کمشن" />
+                                <PropertyColumn Property="f => f.TransactionFeeAmount.ToTwoDecimalPoints()" Title="مقدار کمشن" />
+                                <PropertyColumn Property="f => f.CommisionCurrencyName" Title="ارز کمشن" />
+                                <PropertyColumn Property="f => f.CreatedDate.ToAfghanistanCalendarDate()" Title="تاریخ" Sortable="true" />
+
+                                <!-- Actions Column -->
+                                <TemplateColumn Title="عملیه ها">
+                                    <div class="flex gap-2 justify-center">
+                                        <EditIconButton Disabled="@_isGridDisabled" Content="ویرایش" OnClick="EditItem" Parameter="context.Id" ButtonWidth="4rem" />
+                                        <DeleteIconButton Disabled="@_isGridDisabled" Content="حذف" OnClick="OpenModal" Parameter="context.Id" ButtonWidth="4rem" />
+                                        <PrintIconButton Disabled="@_isGridDisabled" Content="چاپ" OnClick="PrintItem" Parameter="context.Id" ButtonWidth="4rem" />
+                                    </div>
+                                </TemplateColumn>
+                            </QuickGrid>
+
+
+                            <div class="mt-4">
+                                <Paginator State="@paginationState" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </Authorized>
+    </AuthorizeView>
+}
+
+@code {
+
+    #region public Fields
+
+
+    #endregion
+
+    #region private Fields
+
+    [SupplyParameterFromForm(FormName = "TransferForm")]
+    private TransferBetweenAccountHistoryDTO? _transferBetweenAccountDTO { get; set; } = new();
+
+    private int SelectedSenderId
+    {
+        get => _selectedSenderId;
+
+        set
+        {
+            if (_selectedSenderId != value && value != 0)
+            {
+                _selectedSenderId = value;
+                _transferBetweenAccountDTO.SenderId = value;
+                // StateHasChanged(); Ensure UI refreshes
+                _ = InvokeAsync(ShowCustomerTransactions);
+            }
+        }
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    public Dictionary<int, CurrencyDetailDTO> _currencyExchangeRate { get; set; } = new();
+
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+
+    private Dictionary<int, CustomerAccountSummaryDTO> _cutomersInfoList { get; set; } = new();
+
+    private Dictionary<int, CustomerAccountSummaryDTO> _officeAccountList { get; set; } = new();
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 8 };
+
+    private Modal modalRef;
+
+    private CustomerBalanceCard customerBalanceCard { get; set; }
+
+    private TransferSummaryDTO _originalTransferDTO { get; set; }
+
+    private List<TransferSummaryDTO> _customerTransferSummary { get; set; } = new();
+
+    private CancellationTokenSource? _cts = new();
+
+    private bool _initialLoading { get; set; } = false;
+
+    private int _selectedSenderId;
+
+    private int _selectedTransactionAccountId;
+
+    private int SelectedTransactionAccountId
+    {
+        get => _selectedTransactionAccountId;
+        set
+        {
+            // _transferBetweenAccountDTO.CommisionAccountId = value;
+            _selectedTransactionAccountId = value;
+        }
+    }
+
+    private string _selectedCustomerFullName { get; set; } = string.Empty;
+
+    private string _amountInWords { get; set; } = string.Empty;
+
+    private string _commisionAmountInWords { get; set; } = string.Empty;
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    private bool _updateMode { get; set; } = false;
+
+    private bool _isDisabled { get; set; } = false;
+
+    private bool _isGridDisabled { get; set; } = false;
+
+    private bool _loadingCustomerTransactions { get; set; } = false;
+
+    private CommisionType CommisionType { get; set; } = CommisionType.NoComission;
+
+    private DateTime _lastCommisionInputTime;
+
+    private DateTime _lastInputTime;
+
+
+    #endregion
+
+    #region private Methods
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null; // Prevent accidental use after disposal
+        _transferBetweenAccountDTO = null;
+        _customerTransferSummary?.Clear();
+    }
+
+    private async void UpdateCommisionAmount(ChangeEventArgs e)
+    {
+        // _lastCommisionInputTime = DateTime.Now;
+        // await Task.Delay(300);
+        // Only proceed if no new input has occurred in the last 500ms
+        // if ((DateTime.Now - _lastCommisionInputTime).TotalMilliseconds < 300) return;
+
+        if (decimal.TryParse(e.Value?.ToString(), out var amount))
+        {
+            _transferBetweenAccountDTO.TransactionFeeAmount = amount;
+            _commisionAmountInWords = Helper.ConvertToPersianWords(amount);
+        }
+        else
+        {
+            _commisionAmountInWords = string.Empty;
+        }
+    }
+
+    private async Task UpdateAmount(ChangeEventArgs e)
+    {
+        // _lastInputTime = DateTime.Now;
+        // await Task.Delay(300); Wait for 500ms of inactivity
+
+        // Only proceed if no new input has occurred in the last 500ms
+        // if ((DateTime.Now - _lastInputTime).TotalMilliseconds <300) return;
+
+        if (decimal.TryParse(e.Value?.ToString(), out var amount))
+        {
+            _transferBetweenAccountDTO.SendedAmount = amount;
+            _amountInWords = Helper.ConvertToPersianWords(amount);
+        }
+        else
+        {
+            _commisionAmountInWords = string.Empty;
+        }
+    }
+
+    private async Task HandleFormSubmit()
+    {
+        _isDisabled = true;
+        _isGridDisabled = true;
+        if (_updateMode)
+        {
+            await UpdateTransferTransaction();
+        }
+        else
+        {
+            await SaveTransferTransaction();
+        }
+        _isDisabled = false;
+        _isGridDisabled = false;
+    }
+
+    private async Task UpdateTransferTransaction()
+    {
+        _transferBetweenAccountDTO.CommisionAccountId = _selectedTransactionAccountId;
+        if (_transferBetweenAccountDTO.SenderId == _transferBetweenAccountDTO.RecieverId)
+        {
+            toastService.ShowError("حساب فرستنده و گیرنده با هم مشابه است.");
+            return;
+        }
+        try
+        {
+
+            _transferBetweenAccountDTO.CommisionType = CommisionType;
+            // var dealTypeChanged = _transferBetweenAccountDTO. != _originalTransaction.DealType;
+            var amountChanged = _transferBetweenAccountDTO.SendedAmount != _originalTransferDTO.SendedAmount;
+            var currencyChanged = _transferBetweenAccountDTO.CurrencyId != _originalTransferDTO.CurrencyId;
+            var recieverIdChanged = _transferBetweenAccountDTO.RecieverId != _originalTransferDTO.RecieverId;
+            var senderDescritptionChanged = _transferBetweenAccountDTO.SenderDescription != _originalTransferDTO.SenderDescription;
+            var recieverDescritptionChanged = _transferBetweenAccountDTO.RecieverDescription != _originalTransferDTO.RecieverDescription;
+            var sendBy = _transferBetweenAccountDTO.SendBy != _originalTransferDTO.SendBy;
+            var recieverBy = _transferBetweenAccountDTO.RecievedBy != _originalTransferDTO.RecievedBy;
+            var DateChanged = _transferBetweenAccountDTO.CreatedDate.ToShortDateString() != _originalTransferDTO.CreatedDate.ToShortDateString();
+
+            var commisionTypeChanged = _transferBetweenAccountDTO.CommisionType != _originalTransferDTO.CommisionType;
+            var commisionAmountChanged = _transferBetweenAccountDTO.TransactionFeeAmount != _originalTransferDTO.TransactionFeeAmount;
+            var commisionAccountIdChanged = _transferBetweenAccountDTO.CommisionAccountId != _originalTransferDTO.CommisionAccountId;
+            var commisionCurrencyChanged = _transferBetweenAccountDTO.CommisionCurrencyId != _originalTransferDTO.CommisionCurrencyId;
+
+            if (!amountChanged && !currencyChanged && !senderDescritptionChanged && !recieverDescritptionChanged
+            && !sendBy && !recieverBy && !DateChanged && !commisionTypeChanged && !commisionAmountChanged
+            && !commisionAccountIdChanged && !commisionCurrencyChanged && !recieverIdChanged
+            )
+            {
+                toastService.ShowInfo("هیچ تغییری در تراکنش بوجود نیامده است.");
+                return;
+            }
+
+
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+            var url = $"api/TransferBalance/";
+
+
+            if ((senderDescritptionChanged || recieverDescritptionChanged || DateChanged || sendBy || recieverBy)
+             && (!commisionTypeChanged && !amountChanged && !currencyChanged && !commisionAmountChanged
+             && !commisionAccountIdChanged && !commisionCurrencyChanged && !recieverIdChanged))
+            {
+                // implement this Controller
+                url += $"updateDetails/{_transferBetweenAccountDTO.Id}";
+                var response = await _httpClient.PutAsJsonAsync(url, _transferBetweenAccountDTO);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+                if (transaction.Success)
+                {
+                    // update locally
+                    var oldTransaction = _customerTransferSummary.FirstOrDefault(t => t.Id == _transferBetweenAccountDTO.Id);
+                    oldTransaction.SenderDescription = _transferBetweenAccountDTO.SenderDescription;
+                    oldTransaction.RecieverDescription = _transferBetweenAccountDTO.RecieverDescription;
+                    oldTransaction.CreatedDate = _transferBetweenAccountDTO.CreatedDate;
+                    oldTransaction.LastUpdatedDate = _transferBetweenAccountDTO.LastUpdatedDate;
+                    oldTransaction.SendBy = _transferBetweenAccountDTO.SendBy;
+                    oldTransaction.RecievedBy = _transferBetweenAccountDTO.RecievedBy;
+
+                    ResetForm();
+                    StateHasChanged();
+                    toastService.ShowSuccess("تراکنش با موفقیت بروز رسانی شد.");
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+            else
+            {
+                // _transferBetweenAccountDTO.CommisionType = CommisionType;
+
+                if (CommisionType != CommisionType.NoComission)
+                {
+                    if (_transferBetweenAccountDTO.TransactionFeeAmount == 0)
+                    {
+                        toastService.ShowError("لطفا مقدار کمشن را مشخص کنید.");
+                        return;
+                    }
+                    if (_transferBetweenAccountDTO.CommisionAccountId == null || _transferBetweenAccountDTO.CommisionAccountId == 0)
+                    {
+                        toastService.ShowError("لطفا حساب گیرنده کمشن را مشخص کنید.");
+                        return;
+                    }
+
+                    if (_transferBetweenAccountDTO.CommisionCurrencyId == 0 && CommisionType == CommisionType.Cash)
+                    {
+                        toastService.ShowError("لطفا ارز کمشن را مشخص کنید.");
+                        return;
+                    }
+
+                    // update oldTransaction
+                    var senderId = _cutomersInfoList[_transferBetweenAccountDTO.SenderId].AccountNumber;
+                    var recieverId = _cutomersInfoList[_transferBetweenAccountDTO.RecieverId].AccountNumber;
+
+                    _transferBetweenAccountDTO.TransactionFeeRecievedBy = string.Format("کمشن بابت انتقال از حساب {0} به {1}", senderId, recieverId);
+                    _transferBetweenAccountDTO.TransactionFeeDescription = string.Format("کمشن بابت انتقال از حساب {0} به {1}", senderId, recieverId);
+                }
+
+                // implement this Controller
+                url += $"{_transferBetweenAccountDTO.Id}";
+                var response = await _httpClient.PutAsJsonAsync(url, _transferBetweenAccountDTO);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+                if (transaction.Success)
+                {
+                    // rollback balance for old trasnaction
+                    var commisionAmount = _originalTransferDTO.CommisionType == CommisionType.FromSender ? _originalTransferDTO.TransactionFeeAmount : 0;
+                    var amountToDecreaseBalance = _originalTransferDTO.SendedAmount + commisionAmount;
+                    await customerBalanceCard.DecreaseBalance(_originalTransferDTO.CurrencyId, amountToDecreaseBalance, DealType.Withdraw);
+
+                    // update balance for updated transaction
+                    commisionAmount = _transferBetweenAccountDTO.CommisionType == CommisionType.FromSender ? _transferBetweenAccountDTO.TransactionFeeAmount : 0;
+                    var amountToIncreaseBalance = _transferBetweenAccountDTO.SendedAmount + commisionAmount;
+                    await customerBalanceCard.IncreaseBalance(_transferBetweenAccountDTO.CurrencyId, amountToIncreaseBalance, DealType.Withdraw);
+
+                    //update transaction locally
+                    var oldTransaction = _customerTransferSummary.FirstOrDefault(t => t.Id == _transferBetweenAccountDTO.Id);
+                    oldTransaction.SenderDescription = _transferBetweenAccountDTO.SenderDescription;
+                    oldTransaction.RecieverDescription = _transferBetweenAccountDTO.RecieverDescription;
+                    oldTransaction.CreatedDate = _transferBetweenAccountDTO.CreatedDate;
+                    oldTransaction.LastUpdatedDate = _transferBetweenAccountDTO.LastUpdatedDate;
+                    oldTransaction.SendBy = _transferBetweenAccountDTO.SendBy;
+                    oldTransaction.RecievedBy = _transferBetweenAccountDTO.RecievedBy;
+                    oldTransaction.SendedAmount = _transferBetweenAccountDTO.SendedAmount;
+                    oldTransaction.RecievedAmount = _transferBetweenAccountDTO.RecievedAmount;
+                    oldTransaction.RecieverName = _cutomersInfoList[_transferBetweenAccountDTO.RecieverId].CustomerName;
+                    oldTransaction.CurrencyId = _transferBetweenAccountDTO.CurrencyId;
+                    oldTransaction.CurrencyName = _currenciesList[_transferBetweenAccountDTO.CurrencyId].Name;
+                    oldTransaction.RecieverId = _transferBetweenAccountDTO.RecieverId;
+                    oldTransaction.CommisionType = _transferBetweenAccountDTO.CommisionType;
+                    oldTransaction.TransactionFeeAmount = _transferBetweenAccountDTO.TransactionFeeAmount;
+                    oldTransaction.TransactionFeeAccountId = _transferBetweenAccountDTO.TransactionFeeAccountId;
+                    oldTransaction.CommisionCurrencyId = _transferBetweenAccountDTO.CommisionCurrencyId;
+                    oldTransaction.TransactionFeeRecievedBy = _transferBetweenAccountDTO.TransactionFeeRecievedBy;
+                    oldTransaction.TransactionFeeDescription = _transferBetweenAccountDTO.TransactionFeeDescription;
+
+                    if (CommisionType == CommisionType.NoComission)
+                    {
+                        oldTransaction.CommisionCurrencyName = string.Empty;
+                        oldTransaction.TransactionFeeAmount = 0;
+                    }
+                    else if (CommisionType == CommisionType.Cash)
+                    {
+                        oldTransaction.CommisionCurrencyName = _currenciesList[(int)oldTransaction.CommisionCurrencyId].Name;
+                    }
+                    else
+                    {
+                        oldTransaction.CommisionCurrencyName = oldTransaction.CurrencyName;
+                    }
+
+                    ResetForm();
+                    StateHasChanged();
+                    toastService.ShowSuccess("تراکنش با موفقیت بروز رسانی شد.");
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task SaveTransferTransaction()
+    {
+
+        if (_transferBetweenAccountDTO.SenderId == _transferBetweenAccountDTO.RecieverId)
+        {
+            toastService.ShowError("حساب فرستنده و گیرنده با هم مشابه است.");
+            return;
+        }
+        try
+        {
+            _transferBetweenAccountDTO.UserId = _userId;
+            _transferBetweenAccountDTO.CommisionType = CommisionType;
+            _transferBetweenAccountDTO.CommisionAccountId = _selectedTransactionAccountId == 0 ? null : _selectedTransactionAccountId;
+
+            if (CommisionType != CommisionType.NoComission)
+            {
+                if (_transferBetweenAccountDTO.TransactionFeeAmount == 0)
+                {
+                    toastService.ShowError("لطفا مقدار کمشن را مشخص کنید.");
+                    return;
+                }
+                if (_transferBetweenAccountDTO.CommisionAccountId == null || _transferBetweenAccountDTO.CommisionAccountId == 0)
+                {
+                    toastService.ShowError("لطفا حساب گیرنده کمشن را مشخص کنید.");
+                    return;
+                }
+
+                if (_transferBetweenAccountDTO.CommisionCurrencyId == 0 && CommisionType == CommisionType.Cash)
+                {
+                    toastService.ShowError("لطفا ارز کمشن را مشخص کنید.");
+                    return;
+                }
+
+                var senderId = _cutomersInfoList[_transferBetweenAccountDTO.SenderId].AccountNumber;
+                var recieverId = _cutomersInfoList[_transferBetweenAccountDTO.RecieverId].AccountNumber;
+
+                _transferBetweenAccountDTO.TransactionFeeRecievedBy = string.Format("کمشن بابت انتقال از حساب {0} به {1}", senderId, recieverId);
+                _transferBetweenAccountDTO.TransactionFeeDescription = string.Format("کمشن بابت انتقال از حساب {0} به {1}", senderId, recieverId);
+            }
+
+            // var authenticatedUser = await _state;
+            // _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            // if (!_isAuthenticated)
+            // {
+            //     toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            //     return;
+            // }
+
+            // var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = "api/TransferBalance/add";
+
+            _transferBetweenAccountDTO.RecievedAmount = _transferBetweenAccountDTO.SendedAmount;
+
+            var response = await _httpClient.PostAsJsonAsync(url, _transferBetweenAccountDTO);
+            var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+            if (!response.IsSuccessStatusCode || response == null)
+            {
+                toastService.ShowError(transaction.Message);
+                return;
+            }
+
+            if (transaction.Success)
+            {
+
+                _transferBetweenAccountDTO.Id = transaction.Data;
+
+                var newTransferSummary = _transferBetweenAccountDTO.ToTransferSummaryDTO();
+                newTransferSummary.SenderName = _cutomersInfoList[newTransferSummary.SenderId].CustomerName;
+                newTransferSummary.RecieverName = _cutomersInfoList[newTransferSummary.RecieverId].CustomerName;
+                newTransferSummary.CurrencyName = _currenciesList[newTransferSummary.CurrencyId].Name;
+
+                if (CommisionType == CommisionType.NoComission)
+                {
+                    newTransferSummary.CommisionCurrencyName = string.Empty;
+                }
+                else if (CommisionType == CommisionType.Cash)
+                {
+                    newTransferSummary.CommisionCurrencyName = _currenciesList[(int)newTransferSummary.CommisionCurrencyId].Name;
+                }
+                else
+                {
+                    newTransferSummary.CommisionCurrencyName = newTransferSummary.CurrencyName;
+                }
+
+                _customerTransferSummary.Insert(0, newTransferSummary);
+
+                //TODO: update Sender Balance Card
+                var commisionAmount = _transferBetweenAccountDTO.CommisionType == CommisionType.FromSender ? _transferBetweenAccountDTO.TransactionFeeAmount : 0;
+                var amountToDecreaseBalance = newTransferSummary.SendedAmount + commisionAmount;
+                await customerBalanceCard.UpdateCustomerBalanceLocally
+                (newTransferSummary.CurrencyId, amountToDecreaseBalance, DealType.Withdraw);
+
+                ResetForm();
+                StateHasChanged();
+                toastService.ShowSuccess($"انتقال با موفقیت انجام شد.");
+            }
+            else
+            {
+                toastService.ShowError(transaction.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private void ResetForm()
+    {
+        _transferBetweenAccountDTO = new();
+        _amountInWords = string.Empty;
+        _updateMode = false;
+        _isGridDisabled = false;
+        _commisionAmountInWords = string.Empty;
+        CommisionType = CommisionType.NoComission;
+        SelectedTransactionAccountId = 0;
+
+        // _originalTransferDTO = null;
+    }
+
+    private async Task DeleteItem()
+    {
+        try
+        {
+            _isGridDisabled = true;
+            _isDisabled = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = $"api/TransferBalance/{_transactionIdToDelete}";
+            var response = await _httpClient.DeleteFromJsonAsync<ApiResponse<bool>>(url);
+            if (!response.Success || response == null)
+            {
+                toastService.ShowError(response.Message);
+                return;
+            }
+
+            var transaction = _customerTransferSummary.FirstOrDefault(c => c.Id == _transactionIdToDelete);
+            _customerTransferSummary.Remove(transaction);
+
+            // Decrease balance
+            var commisionAmount = transaction.CommisionType == CommisionType.FromSender ? transaction.TransactionFeeAmount : 0;
+            var amountToDecreaseBalance = transaction.SendedAmount + commisionAmount;
+            await customerBalanceCard.DecreaseBalance(transaction.CurrencyId, amountToDecreaseBalance, DealType.Withdraw);
+            customerBalanceCard.CalculateTotalBalance();
+
+            StateHasChanged();
+            toastService.ShowSuccess("تراکنش حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isGridDisabled = false;
+            _isDisabled = false;
+        }
+    }
+
+    private async Task PrintItem(int id)
+    {
+
+    }
+
+    private int _transactionIdToDelete { get; set; }
+
+    private async Task OpenModal(int id)
+    {
+        _transactionIdToDelete = id;
+        string customMessage = $"تراکنش مشتری {_selectedCustomerFullName} به صورت دایمی حذف میشود.";
+        await modalRef.ShowModal(customMessage);
+    }
+
+    private async Task EditItem(int id)
+    {
+        try
+        {
+            var transaction = _customerTransferSummary.FirstOrDefault(t => t.Id == id);
+
+            if (transaction == null)
+            {
+                toastService.ShowError("تراکنش مشتری یافت نشد.");
+                return;
+            }
+
+            _originalTransferDTO = new();
+
+            _originalTransferDTO = transaction;
+
+            _transferBetweenAccountDTO = transaction.DeepClone();
+            SelectedTransactionAccountId = transaction.CommisionAccountId ?? 0;
+
+            _isGridDisabled = true;
+            _updateMode = true;
+            _amountInWords = Helper.ConvertToPersianWords(_originalTransferDTO.SendedAmount);
+            _commisionAmountInWords = Helper.ConvertToPersianWords(_originalTransferDTO.TransactionFeeAmount);
+            CommisionType = _originalTransferDTO.CommisionType;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.InnerException);
+        }
+
+    }
+
+    private async Task ShowCustomerTransactions()
+    {
+        try
+        {
+            _loadingCustomerTransactions = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            UpdateSelectedCustomerFullname();
+
+            string url = $"api/TransferBalance/{SelectedSenderId}";
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<TransferSummaryDTO>>>(url, token);
+
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerTransactions)]);
+                return;
+            }
+
+            _customerTransferSummary?.Clear();
+            _customerTransferSummary = response.Data.ToList();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingCustomerTransactions = false;
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateSelectedCustomerFullname()
+    {
+        var selectedCustomer = _cutomersInfoList[SelectedSenderId];
+        if (selectedCustomer == null)
+        {
+            _selectedCustomerFullName = string.Empty;
+        }
+        else
+        {
+            _selectedCustomerFullName = $"{selectedCustomer.CustomerName} {selectedCustomer.CustomerLastname}";
+        }
+    }
+
+    private async Task FetchCustomers()
+    {
+        try
+        {
+            _initialLoading = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All customers with name and Id
+
+            string url = $"api/CustomerAccount/CustomersSummary/{_userId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CustomerAccountSummaryDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerAccounts)]);
+                return;
+            }
+
+            foreach (var item in response.Data)
+            {
+                if (item.AccountType == eAccountType.Regular)
+                {
+                    _cutomersInfoList.Add(item.CustomerId, item);
+                }
+                else if (item.AccountType == eAccountType.Incremental)
+                {
+                    _officeAccountList.Add(item.CustomerId, item);
+                }
+            }
+
+            await FetchCurrencies();
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _initialLoading = false;
+        }
+    }
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            await FetchCurrencyExchangeRate();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task FetchCurrencyExchangeRate()
+    {
+        try
+        {
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            int baseCurrencyId = _currenciesList.Where(c => c.Value.Code == "USD").FirstOrDefault().Key;
+
+            string url = $"api/Currency/currencyDetail/{baseCurrencyId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDetailDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            foreach (var item in response.Data)
+            {
+                item.ImageString = item.Image != null && item.Image.Length > 0 ?
+                item.Image.ConvertByteArrayToImage() : string.Empty;
+            }
+            _currencyExchangeRate = response.Data.ToDictionary(item => item.TargetCurrencyId, item => item);
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    #endregion
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCustomers();
+    }
+
+    #endregion
+}

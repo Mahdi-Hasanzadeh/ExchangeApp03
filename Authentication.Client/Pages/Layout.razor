@@ -1,0 +1,327 @@
+﻿@using Authentication.Client.Pages.Account
+@rendermode InteractiveWebAssembly
+
+<nav class="dark:bg-gray-800 sticky w-full z-20 top-0 start-0 border-b border-gray-200 dark:border-gray-600">
+    <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
+
+
+        <!-- Hamburger Button -->
+        <div class="flex space-x-3 md:space-x-0 rtl:space-x-reverse">
+            <button @onclick="handleDrawer"
+                    type="button"
+                    class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg  hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+                    aria-controls="navbar-sticky"
+                    aria-expanded="@isMenuOpen">
+                <span class="sr-only">Open main menu</span>
+                <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 1h15M1 7h15M1 13h15" />
+                </svg>
+            </button>
+        </div>
+
+
+        <NavLink href="" class="flex items-center space-x-3 rtl:space-x-reverse">
+            <img src="https://flowbite.com/docs/images/logo.svg" class="h-8" alt="Flowbite Logo">
+            <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">صرافی</span>
+        </NavLink>
+
+
+        <!-- Navigation Menu -->
+        <div class="items-center justify-between w-full md:flex md:w-auto hidden" id="navbar-sticky">
+
+            <ul class="flex flex-row items-center  border-gray-100 rounded-lg bg-gray-50 space-x-8 rtl:space-x-reverse dark:bg-gray-800">
+
+                @if (isAuthenticated)
+                {
+                    <li>
+                        <CurrentUser />
+                    </li>
+                    <li>
+                        <CustomNavLink FontSize="medium" Title="خروج" Href="/logout" />
+                        @* <NavLink href="/logout"
+                                     class="py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:hover:text-blue-700 md:p-0 md:dark:hover:text-blue-500 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent">
+                                خروج
+                            </NavLink> *@
+                    </li>
+                }
+                else
+                {
+                    <li>
+                        <CustomNavLink FontSize="medium" Title="ورود" Href="/login" />
+                    </li>
+
+                    <li>
+                        <CustomNavLink FontSize="medium" Title="ثبت نام" Href="/register" />
+                    </li>
+                }
+                <AuthorizeView>
+                    <NotAuthorized>
+
+                    </NotAuthorized>
+                    <Authorized>
+                    </Authorized>
+
+                </AuthorizeView>
+            </ul>
+        </div>
+        <!-- Drawer -->
+
+        <div class=" @(Drawer ? "relative" : "hidden") transition delay-500 duration-2000 ease-in-out  z-10" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+            <!--
+            Background backdrop, show/hide based on slide-over state.
+
+            Entering: "ease-in-out duration-500"
+            From: "opacity-0"
+            To: "opacity-100"
+            Leaving: "ease-in-out duration-500"
+            From: "opacity-100"
+            To: "opacity-0"
+            -->
+            <div class="fixed inset-0 bg-white/25 backdrop-blur-sm backdrop-saturate-150 border border-white/40 shadow-lg "
+                 aria-hidden="true"></div>
+
+
+            <div class="fixed inset-0 overflow-hidden">
+                <div class="absolute inset-0 overflow-hidden">
+                    <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                        <!--
+                        Slide-over panel, show/hide based on slide-over state.
+
+                        Entering: "transform transition ease-in-out duration-500 sm:duration-700"
+                        From: "translate-x-full"
+                        To: "translate-x-0"
+                        Leaving: "transform transition ease-in-out duration-500 sm:duration-700"
+                        From: "translate-x-0"
+                        To: "translate-x-full"
+                        -->
+                        <div class="pointer-events-auto relative w-screen max-w-md">
+                            <!--
+                            Close button, show/hide based on slide-over state.
+
+                            Entering: "ease-in-out duration-500"
+                            From: "opacity-0"
+                            To: "opacity-100"
+                            Leaving: "ease-in-out duration-500"
+                            From: "opacity-100"
+                            To: "opacity-0"
+                            -->
+                            <div @onclick="handleDrawer" class="absolute left-0 top-0 -ml-8 flex pr-2 pt-4 sm:-ml-10 sm:pr-4">
+                                <button type="button" class="relative rounded-md text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-white">
+                                    <span class="absolute -inset-2.5"></span>
+                                    <span class="sr-only">Close panel</span>
+                                    <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="flex h-full flex-col overflow-y-auto py-6 shadow-xl dark:bg-gray-800">
+                                <div class="px-4 sm:px-6">
+                                    <h2 class="font-medium text-3xl text-white" id="slide-over-title">
+                                        صفحات
+                                    </h2>
+                                </div>
+                                <div class="relative mt-6 flex-1 px-4 sm:px-6">
+                                    <!-- mobile navbar items-->
+                                    <div class="items-center justify-between w-full ">
+                                        <ul class="flex flex-col space-y-2 font-medium w-100 h-auto bg-gray-50 rtl:space-x-reverse dark:bg-gray-800">
+
+                                            <li @onclick="handleDrawer">
+                                                <CustomNavLink FontSize="2xl" Title="داشبورد" Href="/" />
+                                            </li>
+
+                                            <li>
+                                                <details class="group [&_summary::-webkit-details-marker]:hidden">
+                                                    <summary class="flex cursor-pointer items-center justify-between block py-2 px-3 text-white rounded-sm hover:bg-[#243048]">
+                                                        <span class="text-2xl font-medium"> ثبت تراکنش </span>
+                                                        <span class="shrink-0 transition duration-300 group-open:-rotate-180">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                 class="size-5"
+                                                                 viewBox="0 0 20 20"
+                                                                 fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                                      clip-rule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    </summary>
+
+                                                    <ul class="mt-2 space-y-1 px-4 text-white">
+                                                        @foreach (var item in NavItemsHelper.RegisterDepositeItems)
+                                                        {
+                                                            <li @onclick="handleDrawer">
+                                                                <CustomNavLink FontSize="xl" Href="@item.Href" Title="@item.Name" />
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </details>
+                                            </li>
+
+
+                                            <li>
+                                                <details class="group [&_summary::-webkit-details-marker]:hidden">
+                                                    <summary class="flex cursor-pointer items-center justify-between block py-2 px-3 text-white rounded-sm hover:bg-[#243048]">
+                                                        <span class="text-2xl font-medium"> ارزها </span>
+                                                        <span class="shrink-0 transition duration-300 group-open:-rotate-180">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                 class="size-5"
+                                                                 viewBox="0 0 20 20"
+                                                                 fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                                      clip-rule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    </summary>
+
+                                                    <ul class="mt-2 space-y-1 px-4 text-white">
+                                                        @foreach (var item in NavItemsHelper.CurrencySectionItems)
+                                                        {
+                                                            <li @onclick="handleDrawer">
+                                                                <CustomNavLink FontSize="xl" Href="@item.Href" Title="@item.Name" />
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </details>
+                                            </li>
+
+                                           @*  <li>
+                                                <details class="group [&_summary::-webkit-details-marker]:hidden">
+                                                    <summary class="flex cursor-pointer items-center justify-between block py-2 px-3 text-white rounded-sm hover:bg-[#243048]">
+                                                        <span class="text-2xl font-medium"> حسابات </span>
+                                                        <span class="shrink-0 transition duration-300 group-open:-rotate-180">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                 class="size-5"
+                                                                 viewBox="0 0 20 20"
+                                                                 fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                                      clip-rule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    </summary>
+
+                                                    <ul class="mt-2 space-y-1 px-4 text-white">
+                                                        @foreach (var item in NavItemsHelper.AccountManagement)
+                                                        {
+                                                            <li @onclick="handleDrawer">
+                                                                <CustomNavLink FontSize="xl" Href="@item.Href" Title="@item.Name" />
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </details>
+                                            </li> *@
+
+                                            <li>
+                                                <details class="group [&_summary::-webkit-details-marker]:hidden">
+                                                    <summary class="flex cursor-pointer items-center justify-between block py-2 px-3 text-white rounded-sm hover:bg-[#243048]">
+                                                        <span class="text-2xl font-medium"> دفتر کل </span>
+                                                        <span class="shrink-0 transition duration-300 group-open:-rotate-180">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                 class="size-5"
+                                                                 viewBox="0 0 20 20"
+                                                                 fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                                      clip-rule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    </summary>
+
+                                                    <ul class="mt-2 space-y-1 px-4 text-white">
+                                                        @foreach (var item in NavItemsHelper.GeneralLedger)
+                                                        {
+                                                            <li @onclick="handleDrawer">
+                                                                <CustomNavLink FontSize="xl" Href="@item.Href" Title="@item.Name" />
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </details>
+                                            </li>
+
+
+                                            <li>
+                                                <details class="group [&_summary::-webkit-details-marker]:hidden">
+                                                    <summary class="flex cursor-pointer items-center justify-between block py-2 px-3 text-white rounded-sm hover:bg-[#243048]">
+                                                        <span class="text-2xl font-medium"> روزنامه </span>
+                                                        <span class="shrink-0 transition duration-300 group-open:-rotate-180">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                 class="size-5"
+                                                                 viewBox="0 0 20 20"
+                                                                 fill="currentColor">
+                                                                <path fill-rule="evenodd"
+                                                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                                      clip-rule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    </summary>
+
+                                                    <ul class="mt-2 space-y-1 px-4 text-white">
+                                                        @foreach (var item in NavItemsHelper.Magazine)
+                                                        {
+                                                            <li @onclick="handleDrawer">
+                                                                <CustomNavLink FontSize="xl" Href="@item.Href" Title="@item.Name" />
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </details>
+                                            </li>
+
+                                        </ul>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+</nav>
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState?> authState { get; set; }
+    private string? userName;
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isAuth = await authState;
+        if (isAuth.User.Identity.IsAuthenticated)
+        {
+            isAuthenticated = true;
+        }
+
+    }
+
+
+    private bool isMenuOpen = false;
+
+    private bool subMenu = false;
+
+    private bool Drawer = false;
+
+    private void CloseDrawer() => Drawer = false;
+
+    private void handleDrawer()
+    {
+        Drawer = !Drawer;
+    }
+
+    private void handleSubMenu()
+    {
+        // subMenu = !subMenu;
+    }
+
+    private void HandleMenu()
+    {
+        isMenuOpen = !isMenuOpen; // Toggle the menu visibility
+    }
+}

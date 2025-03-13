@@ -1,0 +1,307 @@
+﻿@page "/accounts/personal"
+@using Shared.View_Model.CustomerAccount
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+@if (_loadingPersonalAccounts)
+{
+    <LoadingProgress />
+}
+else
+{
+    <div class="container mx-auto p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 align-center gap-4">
+            @* Form Section *@
+            <div class="shadow-lg lg:col-span-1 bg-white rounded-lg p-4">
+                <h5 class="text-slate-900 text-2xl">@(_updateMode ? "ویرایش حساب" : "افزودن حساب")</h5>
+                <hr class="relative my-4 z-0 opacity-75 border-slate-500">
+
+                <EditForm Model="@PersonalAccount"
+                          OnValidSubmit="HandleFormSubmit"
+                          FormName="AccountForm">
+                    <DataAnnotationsValidator />
+
+                    <!-- Account Name -->
+                    <div class="mb-4">
+                        <Label Content="نام حساب" />
+                        <InputText @bind-Value="PersonalAccount.Name"
+                                   class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                        <ValidationMessage For="() => PersonalAccount.Name" class="text-red-500 text-sm" />
+                    </div>
+                    <!-- Account Type -->
+
+                    <div class="mb-4">
+                        <Label Content="نوعیت حساب" />
+                        <InputSelect @bind-Value="PersonalAccount.AccountType"
+                                     class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+
+                            <option value="0" selected>نوعیت حساب را انتخاب کنید.</option>
+                            @foreach (eAccountType item in Enum.GetValues(typeof(eAccountType)))
+                            {
+                                if (item != eAccountType.Regular)
+                                {
+                                    <option @key="item" value="@item">@Expressions.AccountTypeDictionary[item]</option>
+                                }
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => PersonalAccount.AccountType" class="text-red-500 text-sm" />
+                    </div>
+
+                    <!-- Account Borrow -->
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 dark:text-slate-900">مقدار قرضه (به دالر)</label>
+                        <InputNumber ParsingErrorMessage="عدد مورد نظر اشتباه است" @bind-Value="PersonalAccount.BorrowAmount"
+                                     class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                        <ValidationMessage For="() => PersonalAccount.BorrowAmount" class="text-red-500 text-sm" />
+                    </div>
+
+                    <small class="text-gray-500 dark:text-gray-600">شماره حساب به صورت خودکار توسط سیستم ساخته میشود.</small>
+
+                    <div class="mt-4 text-red-500 text-sm">
+                        <span>@_errorMessage</span>
+                    </div>
+
+                    <div class="flex justify-start gap-4 mt-4">
+                        <MdSuccessButton IsDisabled="@_isDisabled" ButtonType="submit" Content="ثبت اطلاعات" />
+                        <MdDangerButton IsDisabled="@_isDisabled" ButtonType="reset" OnClick="@ResetForm" Content="انصراف" />
+                    </div>
+                </EditForm>
+
+            </div>
+
+            @* Grid Section *@
+            <div class="shadow-sm lg:col-span-2 bg-white rounded-xl p-5 overflow-x-auto border border-gray-200">
+                @if (_loadingPersonalAccounts)
+                {
+                    <h3 class="text-center text-lg font-semibold text-gray-600">در حال بارگیری حسابات شخصی...</h3>
+                }
+                else if (_PersonalAccountList.Count == 0)
+                {
+                    <h3 class="text-center text-lg font-semibold text-gray-600">هیچ حساب شخصی وجود ندارد.</h3>
+
+                }
+                else
+                {
+                    <h1 class="text-2xl font-semibold text-center mb-5 text-gray-800">لیست حسابات</h1>
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">شماره حساب</th>
+                                <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">نام حساب</th>
+                                <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">نوع حساب</th>
+                                <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">($)مقدار قرضه</th>
+                                <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white">
+                            @foreach (var account in _PersonalAccountList.Values)
+                            {
+                                <tr @key="account.Id" class="group relative transition-all duration-150 ease-in-out hover:-translate-y-1
+                                            hover:shadow-lg border-b border-gray-200 group-hover:opacity-100 rounded-lg
+                                            hover:cursor-pointer even:bg-gray-100">
+                                    <td class="px-5 py-4 text-center text-gray-700 font-medium">
+                                        <div class="flex items-center justify-center gap-2">
+                                            @account.Id
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 text-center text-gray-600">@account.Name</td>
+                                    <td class="px-5 py-4 text-center text-gray-600 font-medium">
+                                        @(account.AccountType != null ? Expressions.AccountTypeDictionary[(eAccountType)account.AccountType]
+                                            : account.AccountType)
+                                    </td>
+                                    <td class="px-5 py-4 text-center text-gray-600 font-medium">@account.BorrowAmount.ToThreeDigitFormatPersian()</td>
+                                    <td class="px-5 py-4 flex items-center justify-center gap-2">
+
+                                        <EditIconButton Parameter="@account.Id"
+                                                        Content="ویرایش"
+                                                        OnClick="EditItem"
+                                                        ButtonWidth="6rem"
+                                                        Disabled="@_isGridDisabled" />
+
+                                        <DeleteIconButton Parameter="@account.Id"
+                                                          Content="حذف"
+                                                          OnClick="DeleteItem"
+                                                          ButtonWidth="6rem"
+                                                          Disabled="@_isGridDisabled" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+    #region Private Fields
+
+    private string _errorMessage { get; set; } = string.Empty;
+
+    private bool _loadingPersonalAccounts { get; set; } = false;
+    private Dictionary<int, PersonalAccountDTO> _PersonalAccountList { get; set; } = new();
+
+    private bool _updateMode { get; set; } = false;
+
+    private bool _isDisabled { get; set; } = false;
+
+
+    [SupplyParameterFromForm(FormName = "AccountForm")]
+    private PersonalAccountDTO PersonalAccount { get; set; } = new();
+
+    private bool _isGridDisabled { get; set; } = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _authenticationState { get; set; }
+
+    #endregion
+
+    #region Private Methods
+
+    private void ResetForm()
+    {
+        _updateMode = false;
+        _isGridDisabled = false;
+        PersonalAccount = new();
+    }
+
+    private async Task EditItem(int accountId)
+    {
+        _isGridDisabled = true;
+    }
+
+    private async Task DeleteItem(int accountId)
+    {
+
+    }
+
+    private async Task HandleFormSubmit()
+    {
+        if (_updateMode)
+        {
+            await UpdatePersonalAccountAsync();
+        }
+        else
+        {
+            await AddPersonalAccountAsync();
+        }
+    }
+
+    private async Task AddPersonalAccountAsync()
+    {
+        try
+        {
+            _isDisabled = true;
+            var user = await _authenticationState;
+            if (!user.User.Identity.IsAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            int userId = int.Parse(user.ExtractUserIdFromToken());
+            string jwtToken = user.ExtractJWTFromToken();
+
+            PersonalAccount.UserId = userId;
+
+            CreateCustomerAccountViewModel accountViewModel = new()
+                {
+                    Name = PersonalAccount.Name,
+                    AccountType = PersonalAccount.AccountType,
+                    BorrowAmount = PersonalAccount.BorrowAmount,
+                    UserId = PersonalAccount.UserId,
+                };
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            var response = await _httpClient.PostAsJsonAsync("api/CustomerAccount", accountViewModel);
+            var Account = await response.Content.ReadFromJsonAsync<ApiResponse<CustomerAccountSummaryDTO>>();
+
+            if (response.IsSuccessStatusCode && Account != null)
+            {
+                toastService.ShowSuccess($"حساب شخصی با موفقیت ساخته شد. شماره حساب:{Account.Data.AccountNumber}");
+                PersonalAccount.Id = Account.Data.CustomerId;
+                PersonalAccount.AccountNumber = Account.Data.AccountNumber;
+                _PersonalAccountList.Add(PersonalAccount.Id, PersonalAccount);
+
+                PersonalAccount = new();
+            }
+            else
+            {
+                toastService.ShowError(Account.Message);
+
+            }
+        }
+        catch (Exception ex)
+        {
+            // toastService.ShowError(ex.Message);
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private async Task UpdatePersonalAccountAsync()
+    {
+
+    }
+
+    private async Task FetchPersonalAccounts()
+    {
+        try
+        {
+            _loadingPersonalAccounts = true;
+
+            var authenticatedUser = await _authenticationState;
+            var isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            if (!isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+
+            var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            string url = $"api/CustomerAccount/account/personal/{userId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<PersonalAccountDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(response.Message);
+                return;
+            }
+            _PersonalAccountList = response.Data.ToDictionary(item => item.Id, item => item);
+
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingPersonalAccounts = false;
+        }
+
+
+    }
+    #endregion
+
+    #region Life Cycle
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchPersonalAccounts();
+    }
+
+    #endregion
+}

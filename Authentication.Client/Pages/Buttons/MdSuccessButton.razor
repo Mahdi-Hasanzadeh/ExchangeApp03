@@ -1,0 +1,33 @@
+﻿
+<button disabled="@IsDisabled"
+        class="@($"w-[{ButtonWidth}] flex-none px-3 py-1 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors active:scale-95")"
+        type="@ButtonType"
+        @onclick="HandleClick">
+    @Content
+</button>
+
+@code {
+    [Parameter]
+
+    public string ButtonWidth { get; set; } = "6rem";
+
+    [Parameter]
+    public string Content { get; set; } = "Button";
+
+    [Parameter]
+    public bool IsDisabled { get; set; } = false;
+
+    [Parameter]
+    public string ButtonType { get; set; } = "button"; // Default type is "button"
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (!IsDisabled && OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync();
+        }
+    }
+}

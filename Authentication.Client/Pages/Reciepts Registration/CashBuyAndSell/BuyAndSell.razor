@@ -1,0 +1,980 @@
+﻿@page "/RecieptsRegistration/CashBuyAndSell"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.TransactionsDTOs
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+
+
+<PageTitle>خرید و فروش نقدی</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <Modal @ref="modalRef"
+                   ConfirmationMessage="آیا از حذف این مورد مطمئن هستید؟"
+                   SubmitButtonText="حذف"
+                   OnConfirm="DeleteItem" />
+            <CustomToast />
+
+            @if (_initialLoading)
+            {
+                <LoadingWithImage />
+            }
+            else
+            {
+                <div class="container mx-auto md:px-3">
+
+                    @if (_initialLoading)
+                    {
+                        <LoadingTitle Content="در حال بارگیری اطلاعات ..." />
+                    }
+                    else
+                    {
+                        <div class="shadow-md px-3 py-3 rounded-2xl w-full">
+                            <h5 class="text-slate-900 text-2xl font-semibold mb-4">
+                                @(_updateMode ? "ویرایش تراکنش" : "افزودن تراکنش")
+                            </h5>
+                            <hr class="mb-6 opacity-75 border-slate-400">
+
+                            <EditForm Model="@_transactionModel" OnValidSubmit="HandleFormSubmit" FormName="BuyAndSellForm">
+                                <DataAnnotationsValidator />
+
+                                <div class="flex flex-col md:flex-row gap-6">
+                                    <!-- Left Side -->
+                                    <div class="flex-1 md:pr-6">
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                <div>
+
+                                                    <Label Content="نوع تراکنش" />
+                                                    <div class="flex gap-4">
+                                                        <InputRadioGroup @onchange="handleTransactionChange"
+                                                                         @bind-Value="_transactionModel.TransactionType"
+                                                                         class="flex space-x-6">
+                                                            <label for="Buy" class="flex items-center gap-2 cursor-pointer hover:bg-green-100 px-4 py-2 rounded-lg transition duration-200">
+                                                                <InputRadio Value="TransactionType.Buy"
+                                                                            class="form-radio text-green-500 focus:ring-2 focus:ring-green-400" id="Buy" />
+                                                                <span class="text-green-700 font-medium">خرید</span>
+                                                            </label>
+
+                                                            <label for="Sell" class="flex items-center gap-2 cursor-pointer hover:bg-red-100 px-4 py-2 rounded-lg transition duration-200">
+                                                                <InputRadio Value="TransactionType.Sell"
+                                                                            class="form-radio text-red-500 focus:ring-2 focus:ring-red-400" id="Sell" />
+                                                                <span class="text-red-700 font-medium">فروش</span>
+                                                            </label>
+                                                        </InputRadioGroup>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <Label Content="مبلغ پول" />
+                                                    <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                                                 @bind-Value="_transactionModel.Amount"
+                                                                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                                 @oninput="UpdateAmount"
+                                                                 @onblur="OnAmountBlurred" />
+                                                    <ValidationMessage For="() => _transactionModel.Amount" class="text-red-500 text-sm" />
+                                                    @if (_transactionModel.Amount >= 0)
+                                                    {
+                                                        <strong>به حروف:</strong> @_amountInWords
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label Content="ارز مبدا" />
+                                                    <InputSelectCurrencyMapping CurrencyList="_currenciesList" @bind-BindValueTo="SelectSourceCurrencyId" />
+                                                    <ValidationMessage For="() => _transactionModel.SourceCurrencyId" class="text-red-500 text-sm" />
+                                                </div>
+
+                                                <div>
+                                                    <Label Content="ارز مقصد" />
+                                                    <InputSelectCurrencyMapping CurrencyList="_currenciesList" @bind-BindValueTo="SelectTargetCurrencyId" />
+                                                    <ValidationMessage For="() => _transactionModel.TargetCurrencyId" class="text-red-500 text-sm" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Vertical Border -->
+                                    <div class="hidden md:block w-[1px] bg-gray-300"></div>
+
+                                    <!-- Right Side -->
+                                    <div class="flex-1 md:pl-6">
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                <!-- Exchange Rate -->
+                                                <div>
+                                                    <Label Content="نرخ تبادله" />
+                                                    <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                                                 @bind-Value="_transactionModel.Rate"
+                                                                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                                 @onblur="CalculateConvertedAmount" />
+                                                    <ValidationMessage For="() => _transactionModel.Rate" class="text-red-500 text-sm" />
+                                                </div>
+
+                                                <!-- Converted Amount -->
+                                                <div>
+                                                    <Label Content="مبلغ مبادله شده" />
+                                                    <div class="relative">
+                                                       @*  <InputSelect @bind-Value="SelectedOperator"
+                                                                     class="absolute inset-y-0 left-0 text-red-900 pl-2 pr-1 border rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                                            <option value="0">*</option>
+                                                            <option value="1">/</option>
+                                                        </InputSelect> *@
+                                                        <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                                                     @bind-Value="_transactionModel.ConvertedAmount"
+                                                                     class="pl-10 w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                    </div>
+                                                    <ValidationMessage For="() => _transactionModel.ConvertedAmount" class="text-red-500 text-sm" />
+                                                    @if (_transactionModel.ConvertedAmount >= 0)
+                                                    {
+                                                        <strong>به حروف:</strong> @_convertedAmountInWords
+                                                    }
+                                                </div>
+
+                                            </div>
+
+                                            <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                                                <div class="lg:col-span-3">
+                                                    <Label Content="تفصیلات" />
+                                                    <InputTextArea @bind-Value="_transactionModel.Description"
+                                                                   class="w-full h-11 border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                    <ValidationMessage For="() => _transactionModel.Description" class="text-red-500 text-sm" />
+                                                </div>
+                                                <div class="lg:col-span-2">
+                                                    <Label Content="تاریخ" />
+                                                    <InputDate @bind-Value="_transactionModel.CreatedDate"
+                                                               class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                    <ValidationMessage For="() => _transactionModel.CreatedDate" class="text-red-500 text-sm" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-center mt-6 gap-4">
+                                    <MdSuccessButton IsDisabled="_isDisabled" ButtonType="submit" Content="@(_updateMode ? "بروز رسانی" : "ثبت")" />
+                                    @* <MdInfoButton IsDisabled="_isDisabled" ButtonType="submit" Content="@(_updateMode ? "بروز رسانی و چاپ" : "ثبت و چاپ")" /> *@
+                                    <MdDangerButton IsDisabled="_isDisabled" ButtonType="button" OnClick="ResetTransactionForm" Content="انصراف" />
+                                </div>
+                            </EditForm>
+                        </div>
+                        <!-- Transaction Table Section -->
+                        <div class="shadow-md px-5 py-4 rounded-2xl mx-auto mt-2">
+                            @if (_loadingTransactions)
+                            {
+                                <LoadingTitle Content="در حال بارگیری اطلاعات تراکنش..." />
+                            }
+                            @* else if (_buyAndSellTransactionsList.Count == 0)
+                {
+                    <LoadingTitle Content="هیچ تراکنشی وجود ندارد." />
+                } *@
+                            else
+                            {
+                                <h5 class="text-2xl font-bold text-gray-800 mb-2">آخرین تراکنش های خرید / فروش</h5>
+                                <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                                <div class="border rounded-lg shadow-sm bg-white overflow-hidden">
+                                    <div class="overflow-x-auto">
+                                        <QuickGrid Virtualize Class="w-full border-collapse quick-grid"
+                                                   Items="_buyAndSellTransactionsList.AsQueryable()"
+                                                   Pagination="paginationState">
+                                            <PropertyColumn Property="f => Expressions.TransactionTypeDictionary[f.Value.TransactionType]"
+                                                            Title="نوع تراکنش" Sortable="true" />
+                                            <PropertyColumn Property="f => _currenciesList[f.Value.SourceCurrencyId].Name"
+                                                            Title="ارز مبدا" />
+                                            <PropertyColumn Property="f => f.Value.Amount.ToTwoDecimalPoints()"
+                                                            Title="مقدار" Sortable="true" />
+                                            <PropertyColumn Property="f => f.Value.Rate.ToTwoDecimalPoints()"
+                                                            Title="نرخ تبادله" />
+                                            <PropertyColumn Property="f => _currenciesList[f.Value.TargetCurrencyId].Name"
+                                                            Title="ارز مقصد" />
+                                            <PropertyColumn Property="f => f.Value.ConvertedAmount.ToTwoDecimalPoints()"
+                                                            Title="مقدار مبادله شده" />
+                                            <PropertyColumn Property="f => f.Value.Description"
+                                                            Title="تفصیلات" />
+                                            <PropertyColumn Property="f => f.Value.CreatedDate.ToAfghanistanCalendarDateOnly()"
+                                                            Title="تاریخ" />
+
+                                            <TemplateColumn Title="عملیات">
+                                                <div class="flex gap-3 justify-start items-center">
+                                                    <EditIconButton Disabled="@_isGridDisabled"
+                                                                    Content="ویرایش" OnClick="EditItem"
+                                                                    Parameter="context.Value.Id" />
+                                                    <DeleteIconButton Disabled="@_isGridDisabled"
+                                                                      Content="حذف" OnClick="OpenModal"
+                                                                      Parameter="context.Value.Id" />
+                                                    <PrintIconButton Disabled="@_isGridDisabled"
+                                                                     Content="چاپ" OnClick="PrintItem"
+                                                                     Parameter="context.Value.Id" />
+                                                </div>
+                                            </TemplateColumn>
+                                        </QuickGrid>
+                                    </div>
+                                </div>
+
+                                <!-- Pagination -->
+                                <div class="mt-4">
+                                    <Paginator State="@paginationState" />
+                                </div>
+
+                                <style>
+                                    /* Add global table styling */
+                                    .quick-grid table {
+                                        border-spacing: 0;
+                                        width: 100%;
+                                    }
+
+                                    .quick-grid tr {
+                                        padding: 5px 0;
+                                    }
+
+                                        .quick-grid tr:hover {
+                                            background-color: #f8fafc;
+                                            cursor: pointer;
+                                        }
+
+                                    .quick-grid td {
+                                        border-bottom: 1px solid #e2e8f0;
+                                        padding: 0.75rem;
+                                        font-size: 1.2rem;
+                                    }
+
+                                    .quick-grid th {
+                                        background-color: #f1f5f9;
+                                        padding: 0.75rem;
+                                        font-weight: 600;
+                                        font-size: 1.2rem;
+                                        text-align: right;
+                                    }
+                                </style>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+
+@code {
+
+    #region private Fields
+
+    [SupplyParameterFromForm(FormName = "BuyAndSellForm")]
+    private BuyAndSellTransactionDTO _transactionModel { get; set; } = new();
+
+    private int _selectedOperator { get; set; } = 0;
+
+    private int SelectedOperator
+    {
+        get => _selectedOperator;
+        set
+        {
+            _selectedOperator = value;
+            CalculateConvertedAmount();
+        }
+    }
+
+    private int _transactionIdToDelete { get; set; }
+
+    private int _selectedSourceCurrencyId { get; set; }
+
+    private int SelectSourceCurrencyId
+    {
+        get => _selectedSourceCurrencyId;
+
+        set
+        {
+            if (_selectedSourceCurrencyId != value && value != 0)
+            {
+
+                _selectedSourceCurrencyId = value;
+                _transactionModel.SourceCurrencyId = _selectedSourceCurrencyId;
+                // ResetTransactionForm();
+                // StateHasChanged(); Ensure UI refreshes
+                _ = InvokeAsync(UpdateExchangeRate);
+            }
+        }
+    }
+
+    private int _selectedTargetCurrencyId { get; set; }
+
+    private int SelectTargetCurrencyId
+    {
+        get => _selectedTargetCurrencyId;
+
+        set
+        {
+            if (_selectedTargetCurrencyId != value && value != 0)
+            {
+
+                _selectedTargetCurrencyId = value;
+                _transactionModel.TargetCurrencyId = _selectedTargetCurrencyId;
+                // ResetTransactionForm();
+                // StateHasChanged(); Ensure UI refreshes
+                _ = InvokeAsync(UpdateExchangeRate);
+            }
+        }
+    }
+
+    private bool _sourceCurrencyBigger { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private Dictionary<int, BuyAndSellTransactionDTO> _buyAndSellTransactionsList { get; set; } = new();
+
+    public List<CurrencyDetailDTOForAllRates> _currencyExchangeRate { get; set; } = new();
+
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+
+    private Dictionary<int, CustomerAccountSummaryDTO> _cutomersInfoList { get; set; } = new();
+
+    private Dictionary<int, CustomerAccountSummaryDTO> _officeAccountList { get; set; } = new();
+
+    private BuyAndSellTransactionDTO _originalTransaction { get; set; }
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 8 };
+
+    private Modal modalRef;
+
+    private CustomerBalanceCard customerBalanceCard { get; set; }
+
+    private CancellationTokenSource? _cts = new();
+
+    private bool _initialLoading { get; set; } = false;
+
+    private int _selectedSenderId;
+
+    private int _selectedTransactionAccountId;
+
+    private string _selectedCustomerFullName { get; set; } = string.Empty;
+
+    private string _amountInWords { get; set; } = string.Empty;
+
+    private string _convertedAmountInWords { get; set; } = string.Empty;
+
+    private string _commisionAmountInWords { get; set; } = string.Empty;
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    private bool _updateMode { get; set; } = false;
+
+    private bool _isDisabled { get; set; } = false;
+
+    private bool _isGridDisabled { get; set; } = false;
+
+    private bool _loadingTransactions { get; set; } = false;
+
+    private DateTime _lastCommisionInputTime;
+
+    private DateTime _lastInputTime;
+
+    #endregion
+
+    #region Private Methods
+
+    private void EditItem(int transactionId)
+    {
+        var transaction = _buyAndSellTransactionsList[transactionId];
+
+        if (transaction == null)
+        {
+            toastService.ShowError("تراکنش یافت نشد.");
+            return;
+        }
+
+        _originalTransaction = transaction;
+        _transactionModel = transaction.DeepClone();
+        _transactionModel.Amount = _transactionModel.Amount.ToTwoDecimalPoints();
+        _transactionModel.ConvertedAmount = _transactionModel.ConvertedAmount.ToTwoDecimalPoints();
+        _transactionModel.Rate = _transactionModel.Rate.ToTwoDecimalPoints();
+        _selectedSourceCurrencyId = _transactionModel.SourceCurrencyId;
+        _selectedTargetCurrencyId = _transactionModel.TargetCurrencyId;
+
+        _isGridDisabled = true;
+        _updateMode = true;
+        _amountInWords = Helper.ConvertToPersianWords(_originalTransaction.Amount);
+        GetExchangeRate();
+
+        // _commisionAmountInWords = Helper.ConvertToPersianWords(_originalTransferDTO.TransactionFeeAmount);
+        // CommisionType = _originalTransferDTO.CommisionType;
+    }
+
+    private void PrintItem(int transactionId)
+    {
+
+    }
+
+    private async Task OpenModal(int transactionId)
+    {
+        _transactionIdToDelete = transactionId;
+        string customMessage = $"تراکنش به صورت دایمی حذف میشود!";
+        await modalRef.ShowModal(customMessage);
+    }
+
+    private void ResetTransactionForm()
+    {
+        _transactionModel = new();
+        _amountInWords = string.Empty;
+        _convertedAmountInWords = string.Empty;
+        _updateMode = false;
+        _isGridDisabled = false;
+        _originalTransaction = null;
+        _selectedSourceCurrencyId = 0;
+        _selectedTargetCurrencyId = 0;
+    }
+
+    private async Task HandleFormSubmit()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _isDisabled = true;
+        _isGridDisabled = true;
+
+        if (_updateMode)
+        {
+            await UpdateTransaction();
+        }
+        else
+        {
+            await SaveTransaction();
+        }
+        _isDisabled = false;
+        _isGridDisabled = false;
+    }
+
+    private async Task UpdateTransaction()
+    {
+        try
+        {
+            var descriptionChanged = _transactionModel.Description != _originalTransaction.Description;
+            var createdDateChanged = _transactionModel.CreatedDate.ToShortDateString() != _originalTransaction.CreatedDate.ToShortDateString();
+            var amountChanged = _transactionModel.Amount != _originalTransaction.Amount;
+            var sourceCurrencyChanged = _transactionModel.SourceCurrencyId != _originalTransaction.SourceCurrencyId;
+            var targetCurrencyChanged = _transactionModel.TargetCurrencyId != _originalTransaction.TargetCurrencyId;
+            var transactionTypeChanged = _transactionModel.TransactionType != _originalTransaction.TransactionType;
+            var rateChanged = _transactionModel.Rate != _originalTransaction.Rate;
+            var convertedAmountChanged = _transactionModel.ConvertedAmount != _originalTransaction.ConvertedAmount;
+
+            if (!amountChanged && !descriptionChanged && !createdDateChanged && !sourceCurrencyChanged
+            && !targetCurrencyChanged && !transactionTypeChanged && !rateChanged && !convertedAmountChanged)
+            {
+                toastService.ShowInfo("هیچ تغییری در تراکنش بوجود نیامده است.");
+                return;
+            }
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+            var url = $"api/CashBuyAndSell/";
+
+            if ((descriptionChanged || createdDateChanged)
+            && (!sourceCurrencyChanged && !amountChanged && !transactionTypeChanged && !rateChanged
+            && !convertedAmountChanged && !targetCurrencyChanged))
+            {
+                url += $"updateDetails/{_originalTransaction.Id}";
+                var response = await _httpClient.PutAsJsonAsync(url, _transactionModel);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+                if (transaction.Success)
+                {
+                    // update locally
+
+                    var oldTransaction = _buyAndSellTransactionsList[_originalTransaction.Id];
+
+                    oldTransaction.Description = _transactionModel.Description;
+                    oldTransaction.CreatedDate = _transactionModel.CreatedDate;
+                    oldTransaction.UpdatedDate = DateTime.Now;
+                    ResetTransactionForm();
+                    StateHasChanged();
+                    toastService.ShowSuccess("تراکنش با موفقیت بروز رسانی شد.");
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+            else
+            {
+                url += $"{_originalTransaction.Id}";
+                var response = await _httpClient.PutAsJsonAsync(url, _transactionModel);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+                if (transaction.Success)
+                {
+                    //update transaction locally
+                    var oldTransaction = _buyAndSellTransactionsList[_originalTransaction.Id];
+                    oldTransaction.Description = _transactionModel.Description;
+                    oldTransaction.CreatedDate = _transactionModel.CreatedDate;
+                    oldTransaction.UpdatedDate = DateTime.Now;
+                    oldTransaction.Amount = _transactionModel.Amount;
+                    oldTransaction.TransactionType = _transactionModel.TransactionType;
+                    oldTransaction.SourceCurrencyId = _transactionModel.SourceCurrencyId;
+                    oldTransaction.TargetCurrencyId = _transactionModel.TargetCurrencyId;
+                    oldTransaction.Rate = _transactionModel.Rate;
+                    oldTransaction.ConvertedAmount = _transactionModel.ConvertedAmount;
+
+                    ResetTransactionForm();
+                    StateHasChanged();
+                    toastService.ShowSuccess("تراکنش با موفقیت بروز رسانی شد.");
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    public async Task SaveTransaction()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = "api/CashBuyAndSell";
+
+            _transactionModel.UserId = _userId;
+            if (_transactionModel.Description == string.Empty)
+            {
+                _transactionModel.Description = "";
+            }
+            var response = await _httpClient.PostAsJsonAsync(url, _transactionModel);
+            var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+            if (!response.IsSuccessStatusCode || response == null)
+            {
+                toastService.ShowError(transaction.Message);
+                return;
+            }
+
+            if (transaction.Success)
+            {
+                toastService.ShowSuccess($"انتقال با موفقیت انجام شد.");
+
+                _transactionModel.Id = transaction.Data;
+
+                _buyAndSellTransactionsList.Add(_transactionModel.Id, _transactionModel);
+                //TODO: update Sender Balance Card
+                // var commisionAmount = _transferBetweenAccountDTO.CommisionType == CommisionType.FromSender ? _transferBetweenAccountDTO.TransactionFeeAmount : 0;
+                // var amountToDecreaseBalance = newTransferSummary.SendedAmount + commisionAmount;
+                // await customerBalanceCard.UpdateCustomerBalanceLocally
+                // (newTransferSummary.CurrencyId, amountToDecreaseBalance, DealType.Withdraw);
+
+                ResetTransactionForm();
+                StateHasChanged();
+            }
+            else
+            {
+                toastService.ShowError(transaction.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _initialLoading = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            if (_currenciesList.Count > 0)
+            {
+                await FetchCurrencyExchangeRate();
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _initialLoading = false;
+        }
+    }
+
+    private async Task FetchCurrencyExchangeRate()
+    {
+        try
+        {
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // int baseCurrencyId = _currenciesList.Where(c => c.Value.Code == "USD").FirstOrDefault().Key;
+
+            string url = $"api/Currency/currencyDetail";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDetailDTOForAllRates>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+
+            _currencyExchangeRate = response.Data!.ToList();
+            await FetchBuyAndSellTransactions();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task DeleteItem()
+    {
+        try
+        {
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[ErrorList.NotAuthenticated.ToString()]);
+                return;
+            }
+            _isGridDisabled = true;
+            _isDisabled = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = $"api/CashBuyAndSell/{_transactionIdToDelete}";
+            var response = await _httpClient.DeleteFromJsonAsync<ApiResponse<bool>>(url);
+            if (!response.Success || response == null)
+            {
+                toastService.ShowError(response.Message);
+                return;
+            }
+
+            _buyAndSellTransactionsList.Remove(_transactionIdToDelete);
+
+            StateHasChanged();
+            toastService.ShowSuccess("تراکنش حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isGridDisabled = false;
+            _isDisabled = false;
+        }
+    }
+
+    private void UpdateAmount(ChangeEventArgs e)
+    {
+        try
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out var amount))
+            {
+                _transactionModel.Amount = amount;
+
+                var amountInWords = Helper.ConvertToPersianWords(_transactionModel.Amount);
+
+                // var selectedCurreny = Expressions.CurrencyDictionary[_customerTransactionModel.Currency];
+
+                _amountInWords = $"{amountInWords} ";
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("عدد مورد نظر بیش از حد بزرگ است");
+        }
+
+    }
+
+    private void CalculateConvertedAmount()
+    {
+        if (_transactionModel.TargetCurrencyId != 0 && _transactionModel.SourceCurrencyId != 0)
+        {
+
+            // Calculate converted amount
+            var amount = _transactionModel.Amount;
+            var rate = _transactionModel.Rate;
+
+            var sourceCurrency = _currenciesList[_selectedSourceCurrencyId];
+            var targetCurrency = _currenciesList[_selectedTargetCurrencyId];
+
+            // decimal adjustedRate = 0;
+
+            // if (sourceCurrency.Unit > 1)
+            // {
+            //     adjustedRate = rate / sourceCurrency.Unit;
+            //     _transactionModel.ConvertedAmount = _selectedOperator == 0 ? Math.Round(amount * adjustedRate, 2) : Math.Round(amount / adjustedRate, 2);
+            // }
+            // else if (targetCurrency.Unit > 1)
+            // {
+            //     adjustedRate = rate * targetCurrency.Unit;
+            //     _transactionModel.ConvertedAmount = _selectedOperator == 0 ? Math.Round(amount * adjustedRate, 2) : Math.Round(amount / adjustedRate, 2);
+            // }
+            // else
+            // {
+            //     _transactionModel.ConvertedAmount = _selectedOperator == 0 ? Math.Round(amount * rate, 2) : Math.Round(amount / rate, 2);
+            // }
+
+            _transactionModel.ConvertedAmount = _sourceCurrencyBigger ? Math.Round(amount * rate, 2) : Math.Round(amount / rate, 2);
+            if (sourceCurrency.Unit == 1 && targetCurrency.Unit > 1 && sourceCurrency.Code == "AFN"
+            && (targetCurrency.Code == "IRR" || targetCurrency.Code == "PKR"))
+            {
+                _transactionModel.ConvertedAmount *= targetCurrency.Unit;
+            }
+            else if (sourceCurrency.Unit > 1 && targetCurrency.Unit == 1 && (sourceCurrency.Code == "IRR" || sourceCurrency.Code == "PKR")
+            && targetCurrency.Code == "AFN"
+            )
+            {
+                _transactionModel.ConvertedAmount /= sourceCurrency.Unit;
+            }
+            _transactionModel.ConvertedAmount = _transactionModel.ConvertedAmount.ToTwoDecimalPoints();
+            _convertedAmountInWords = Helper.ConvertToPersianWords(_transactionModel.ConvertedAmount) + $" {targetCurrency.Name}";
+
+            return;
+
+            if (sourceCurrency.Unit == 1 && targetCurrency.Unit == 1000)
+            {
+
+                _transactionModel.ConvertedAmount = _transactionModel.ConvertedAmount * 1000;
+            }
+            else if (sourceCurrency.Unit == 100 && targetCurrency.Unit == 1)
+            {
+                _transactionModel.ConvertedAmount = _selectedOperator == 0 ? Math.Round(amount * rate, 2) : Math.Round(amount / rate, 2);
+                _transactionModel.ConvertedAmount = _transactionModel.ConvertedAmount / 1000;
+            }
+
+
+            // _transactionModel.ConvertedAmount = _sourceCurrencyBigger ? Math.Round(amount * rate, 2) : Math.Round(amount / rate, 2);
+
+            // _sourceCurrencyBigger = buyValue1 > buyValue2;
+
+            // _transactionModel.Rate = (decimal)exchangeRate!;
+
+
+
+
+
+
+            // var rates = _currencyExchangeRate
+            // .Where(c => (c.BaseCurrencyId == _selectedSourceCurrencyId && c.TargetCurrencyId == _selectedTargetCurrencyId)
+            // || (c.BaseCurrencyId == _selectedTargetCurrencyId && c.TargetCurrencyId == _selectedSourceCurrencyId)
+            // )!.ToList();
+
+
+            // var rate1 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedSourceCurrencyId)!;
+            // var rate2 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedTargetCurrencyId)!;
+
+
+            // var buyValue1 = rate1.BuyValue;
+            // var buyValue2 = rate2.BuyValue;
+
+            // decimal? exchangeRate = 0;
+            // if (rate1.Unit > 1 || rate2.Unit > 1)
+            // {
+            //     _sourceCurrencyBigger = buyValue1 < buyValue2;
+            //     exchangeRate = buyValue1 > buyValue2 ? buyValue2 : buyValue1;
+            // }
+            // else
+            // {
+            //     _sourceCurrencyBigger = buyValue1 > buyValue2;
+            //     exchangeRate = buyValue1 > buyValue2 ? buyValue1 : buyValue2;
+            // }
+
+            // _sourceCurrencyBigger = buyValue1 > buyValue2;
+            // var exchangeRate = buyValue1 > buyValue2 ? buyValue1 : buyValue2;
+
+            // _transactionModel.Rate = (decimal)exchangeRate!;
+
+            // var amount = _transactionModel.Amount;
+            // var rate = _transactionModel.Rate;
+            // _transactionModel.ConvertedAmount = _sourceCurrencyBigger ? Math.Round(amount * rate, 2) : Math.Round(amount / rate, 2);
+            // }
+        }
+    }
+
+    private void OnAmountBlurred(FocusEventArgs e)
+    {
+        CalculateConvertedAmount();
+    }
+
+    private void GetExchangeRate()
+    {
+        if (_transactionModel.SourceCurrencyId != 0 && _transactionModel.TargetCurrencyId != 0)
+        {
+            if (_transactionModel.SourceCurrencyId == _transactionModel.TargetCurrencyId)
+            {
+                _transactionModel.Rate = 1;
+                CalculateConvertedAmount();
+                return;
+            }
+
+            if (_transactionModel.TransactionType == TransactionType.Buy)
+            {
+                var rates = _currencyExchangeRate
+                .Where(c => (c.BaseCurrencyId == _selectedSourceCurrencyId && c.TargetCurrencyId == _selectedTargetCurrencyId)
+                || (c.BaseCurrencyId == _selectedTargetCurrencyId && c.TargetCurrencyId == _selectedSourceCurrencyId)
+                )!.ToList();
+
+                var rate1 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedSourceCurrencyId)!;
+                var rate2 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedTargetCurrencyId)!;
+
+                var buyValue1 = rate1.BuyValue;
+                var buyValue2 = rate2.BuyValue;
+
+                var first = _currenciesList[rate1.BaseCurrencyId];
+                var second = _currenciesList[rate2.BaseCurrencyId];
+
+                var adujstedbuyValue1 = buyValue1;  // Adjust for unit
+                var adujstedbuyValue2 = buyValue2;  // Adjust for unit
+
+                _sourceCurrencyBigger = adujstedbuyValue1 > adujstedbuyValue2;
+                decimal? exchangeRate = 0;
+                if ((first.Code == "AFN" && second.Code == "IRR") || (first.Code == "IRR" && second.Code == "AFN"))
+                {
+                    _sourceCurrencyBigger = adujstedbuyValue1 < adujstedbuyValue2;
+                    exchangeRate = adujstedbuyValue1 < adujstedbuyValue2 ? adujstedbuyValue1 : adujstedbuyValue2;
+                    _transactionModel.Rate = (decimal)exchangeRate!;
+                    return;
+                }
+
+                _sourceCurrencyBigger = adujstedbuyValue1 > adujstedbuyValue2;
+                exchangeRate = adujstedbuyValue1 > adujstedbuyValue2 ? adujstedbuyValue1 : adujstedbuyValue2;
+                _transactionModel.Rate = (decimal)exchangeRate!;
+
+
+            }
+            else
+            {
+                var rates = _currencyExchangeRate
+                .Where(c => (c.BaseCurrencyId == _selectedSourceCurrencyId && c.TargetCurrencyId == _selectedTargetCurrencyId)
+                || (c.BaseCurrencyId == _selectedTargetCurrencyId && c.TargetCurrencyId == _selectedSourceCurrencyId)
+                )!.ToList();
+
+                var sellValue1 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedSourceCurrencyId)!.SellValue;
+                var sellValue2 = rates.FirstOrDefault(c => c.BaseCurrencyId == _selectedTargetCurrencyId)!.SellValue;
+
+                _sourceCurrencyBigger = sellValue1 > sellValue2;
+
+                var exchangeRate = sellValue1 > sellValue2 ? sellValue1 : sellValue2;
+
+                _transactionModel.Rate = (decimal)exchangeRate!;
+            }
+            CalculateConvertedAmount();
+        }
+    }
+
+    private void UpdateExchangeRate()
+    {
+        GetExchangeRate();
+    }
+
+    private void handleTransactionChange(ChangeEventArgs e)
+    {
+        GetExchangeRate();
+    }
+
+    private async Task FetchBuyAndSellTransactions()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            string url = $"api/CashBuyAndSell/{_userId}";
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<BuyAndSellTransactionDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(response.Message ?? "دریافت اطلاعات تراکنش با مشکل مواجه شد.");
+                return;
+            }
+            _buyAndSellTransactionsList = response.Data.ToDictionary(item => item.Id, item => item);
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    #endregion
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCurrencies();
+    }
+
+    #endregion
+}

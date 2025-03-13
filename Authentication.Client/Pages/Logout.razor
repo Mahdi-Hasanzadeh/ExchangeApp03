@@ -1,0 +1,59 @@
+﻿@page "/logout"
+@rendermode InteractiveWebAssembly
+@inject IJSRuntime JS
+@using Authentication.Client.ClientAuthentication
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Http
+@* @inject AuthenticationStateProvider AuthenticationStateProvider *@
+@inject ClientAuthenticationStateProvider AuthStateProvider
+
+<div class="flex items-center justify-center">
+    <div class="bg-white shadow-lg rounded-2xl p-6 max-w-md text-center">
+        <div class="flex items-center justify-center w-16 h-16 bg-green-100 text-green-600 rounded-full mx-auto">
+            <i class="bi bi-check-lg text-4xl"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mt-4">خروج موفق</h3>
+        <p class="text-gray-600 mt-2">شما با موفقیت از حساب خود خارج شدید.</p>
+        <a href="/login" class="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition">
+            ورود مجدد
+        </a>
+    </div>
+</div>
+
+@code {
+
+    #region Public Fields
+
+    [CascadingParameter]
+    public HttpContext HttpContext { get; set; }
+
+    [CascadingParameter]
+    public Task<AuthenticationState> _state { get; set; }
+
+    #endregion
+
+    #region Private Fields
+
+    #endregion
+
+    #region Life Cycle Methods
+
+    //BUG: After logout the user is still authenticated until refresh the page
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticated = await _state;
+        if (authenticated.User.Identity.IsAuthenticated)
+        {
+            await AuthStateProvider.SignOutAsync();
+            StateHasChanged();
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    #endregion
+
+}

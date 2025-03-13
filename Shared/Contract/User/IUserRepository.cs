@@ -1,0 +1,27 @@
+﻿using Shared.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Shared.Contract.User
+{
+    public interface IUserRepository
+    {
+        public Task<UserEntity?> GetUserByIdAsync(int id);
+
+        public Task<UserEntity?> GetUserByUsernameAsync(string username);
+
+        public Task<UserEntity?> GetUserByEmailAsync(string email);
+
+        public Task BeginTransaction();
+        public Task CommitTransaction();
+        public Task RollbackTransaction();
+
+        public Task<bool> AddUserAsync(UserEntity user);
+
+        public Task SaveAsync();
+
+    }
+}

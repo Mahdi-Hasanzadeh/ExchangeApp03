@@ -1,0 +1,16 @@
+﻿<NavLink href="@Href"
+         class=@($"block rounded-lg px-2 py-2 text-{FontSize} font-medium text-white hover:bg-[#243048]")>
+    @Title
+</NavLink>
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = "#";
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string FontSize { get; set; } = "2xl";
+
+}

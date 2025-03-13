@@ -1,0 +1,234 @@
+﻿@using Shared.Enums
+@using Shared.View_Model.CustomerAccount
+@rendermode InteractiveWebAssembly
+
+<CustomToast />
+
+<!-- Button to Open Modal -->
+<!-- Modal Overlay -->
+@if (isModalOpen)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-40" @onclick="ToggleModal"></div>
+}
+
+<button @onclick="ToggleModal" class="md:fixed top-[150px] z-10 right-0 px-4 py-2 bg-gray-600 opacity-75 text-white rounded-md hover:bg-gray-900 hover:text-white transition duration-300">
+    افزودن مشتری جدید
+</button>
+<!-- Modal Panel -->
+<div class="fixed top-1/2 right-0 transform -translate-y-1/2 w-2/3 lg:w-1/3 h-3/4 shadow-xl z-50 transition-transform duration-500 ease-in-out
+             bg-gradient-to-r dark:from-gray-100 dark:to-gray-300 dark:text-slate-900
+            @((isModalOpen ? "translate-x-0" : "translate-x-full")) rounded-l-2xl overflow-y-auto">
+
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 class="text-2xl font-semibold text-gray-800 dark:text-black">📝 ثبت اطلاعات مشتری جدید</h2>
+        <button @onclick="ToggleModal" class="text-gray-600 dark:text-black hover:text-red-500 transition">✕</button>
+    </div>
+
+    <!-- Form Content -->
+    <EditForm Model="@CustomerModel" OnValidSubmit="HandleCreateCustomer" class="p-4">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-red-500" />
+
+        <div class="mb-4">
+            <label class="block text-gray-700 dark:text-slate-900">نام <span class="text-red-500 text-sm">*</span></label>
+            <InputText @bind-Value="CustomerModel.Name" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+            <ValidationMessage For="() => CustomerModel.Name" class="text-red-500 text-sm" />
+        </div>
+
+        <div class="mb-4">
+            <Label Content="تخلص" />
+            <InputText @bind-Value="CustomerModel.Lastname" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+            <ValidationMessage For="() => CustomerModel.Lastname" class="text-red-500 text-sm" />
+        </div>
+
+        <div class="mb-4">
+            <Label Content="سقف اعتبار (به دالر)" />
+            <InputNumber ParsingErrorMessage="عدد مورد نظر اشتباه است" @bind-Value="CustomerModel.BorrowAmount" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+            <ValidationMessage For="() => CustomerModel.BorrowAmount" class="text-red-500 text-sm" />
+        </div>
+
+        <div class="mb-4">
+            <Label Content="شماره موبایل" />
+            <InputText @bind-Value="CustomerModel.Mobile" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+            <ValidationMessage For="() => CustomerModel.Mobile" class="text-red-500 text-sm" />
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div>
+                <Label Content="شماره پاسپورت" />
+                <InputText @bind-Value="CustomerModel.PassportNumber" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                <ValidationMessage For="() => CustomerModel.PassportNumber" class="text-red-500 text-sm" />
+            </div>
+            <div>
+                <Label Content="شماره تذکره" />
+                <InputText @bind-Value="CustomerModel.IDCardNumber" class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                <ValidationMessage For="() => CustomerModel.IDCardNumber" class="text-red-500 text-sm" />
+            </div>
+        </div>
+        <!-- Image Upload Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div>
+                <Label Content="آپلود تصویر" />
+                <UploadButton SelectedFileName="@_selectedFileName" OnChange="@HandleImageChange" />
+                <ValidationMessage For="() => CustomerModel.Image" class="text-red-500 text-sm" />
+            </div>
+            <div>
+                <!-- Image Preview -->
+                @if (!string.IsNullOrEmpty(_previewImage))
+                {
+                    <img src="@_previewImage" alt="پیش‌نمایش" class="mt-2 rounded-md shadow-md w-32 h-32 object-cover" />
+                }
+            </div>
+        </div>
+
+        <small class="text-gray-500 dark:text-gray-600">شماره حساب به صورت خودکار توسط سیستم ساخته میشود.</small>
+
+        <div class="mt-4 text-red-500 text-sm">
+            <span>@errorMessage</span>
+        </div>
+
+        <div class="flex justify-start gap-4 mt-4">
+            <MdSuccessButton IsDisabled="@_isDisabled" ButtonType="submit" Content="ثبت اطلاعات" />
+            <MdDangerButton IsDisabled="@_isDisabled" ButtonType="reset" OnClick="@ResetForm" Content="انصراف" />
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    private async Task HandleImageChange(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+
+            // ✅ Update the displayed file name
+            _selectedFileName = file.Name;
+
+            // ✅ Validate Image Size (Max 5MB)
+            if (file.Size > 5 * 1024 * 1024)
+            {
+                toastService.ShowError("حجم تصویر نباید بیشتر از 5 مگابایت باشد.");
+                // _errorMessage = "حجم تصویر نباید بیشتر از 5 مگابایت باشد.";
+                _previewImage = null;
+                return;
+            }
+
+            // ✅ Read Image as Byte Array
+            using (var stream = new MemoryStream())
+            {
+                await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(stream);
+                CustomerModel.Image = stream.ToArray();
+            }
+
+            // ✅ Generate Base64 Preview
+            _previewImage = $"data:{file.ContentType};base64,{Convert.ToBase64String(CustomerModel.Image)}";
+
+            // _errorMessage = null; Clear error if successful
+            StateHasChanged(); // Ensure the UI updates after file selection
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("در آپلود تصویر خطای رخ داده است");
+        }
+
+    }
+
+    private void ResetForm()
+    {
+        CustomerModel = new()
+            {
+                Name = string.Empty,
+                AccountType = eAccountType.Regular
+            };
+        _previewImage = null;
+        _selectedFileName = "هیچ فایلی انتخاب نشده است";
+    }
+
+    private bool isModalOpen = false;
+
+    private string _selectedFileName = "هیچ فایلی انتخاب نشده است";
+
+    private string? _previewImage;
+
+    private void ToggleModal()
+    {
+        isModalOpen = !isModalOpen;
+    }
+
+    [Parameter]
+    public EventCallback<CustomerAccountSummaryDTO> AddCustomerToList { get; set; }
+
+    private bool _isDisabled { get; set; } = false;
+
+    private string errorMessage { get; set; } = string.Empty;
+
+    private string _successMessage { get; set; } = string.Empty;
+
+    [SupplyParameterFromForm(FormName = "AccountForm")]
+
+    private CreateCustomerAccountViewModel CustomerModel { get; set; } = new()
+        {
+            Name = string.Empty,
+            AccountType = eAccountType.Regular
+        };
+
+    private bool isExpanded = false; // To track if the chevron is pointing up or down
+
+    private void ToggleCardSection()
+    {
+        isExpanded = !isExpanded; // Change the chevron icon direction
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _authentication { get; set; }
+
+    private async Task HandleCreateCustomer()
+    {
+        try
+        {
+            _isDisabled = true;
+            var user = await _authentication;
+            if (!user.User.Identity.IsAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            int userId = int.Parse(user.ExtractUserIdFromToken());
+            string jwtToken = user.ExtractJWTFromToken();
+
+            CustomerModel.UserId = userId;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            var response = await _httpClient.PostAsJsonAsync("api/CustomerAccount", CustomerModel);
+            var Account = await response.Content.ReadFromJsonAsync<ApiResponse<CustomerAccountSummaryDTO>>();
+
+            if (response.IsSuccessStatusCode && Account != null)
+            {
+                toastService.ShowSuccess($"حساب مشتری با موفقیت ساخته شد. شماره حساب:{Account.Data.AccountNumber}");
+                await AddCustomerToList.InvokeAsync
+                (new CustomerAccountSummaryDTO(Account.Data.CustomerId, CustomerModel.Name, Account.Data.AccountNumber, Account.Data.CustomerLastname, Account.Data.AccountType));
+                ResetForm();
+            }
+            else
+            {
+                toastService.ShowError(Account.Message);
+
+            }
+        }
+        catch (Exception ex)
+        {
+            // toastService.ShowError(ex.Message);
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+}
+
+
+

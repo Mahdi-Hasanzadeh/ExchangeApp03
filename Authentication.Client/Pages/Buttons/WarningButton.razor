@@ -1,0 +1,28 @@
+﻿<button disabled="@IsDisabled" class="w-[5rem] px-3 py-1 text-yellow-700 bg-yellow-100 rounded-lg
+                    hover:bg-yellow-200 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+        type="@ButtonType"
+        @onclick="@HandleClick">
+    @Content
+</button>
+
+@code {
+    [Parameter]
+    public string Content { get; set; } = "Warning";
+
+    [Parameter]
+    public bool IsDisabled { get; set; } = false;
+
+    [Parameter]
+    public string ButtonType { get; set; } = "button";
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (!IsDisabled && OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync();
+        }
+    }
+}

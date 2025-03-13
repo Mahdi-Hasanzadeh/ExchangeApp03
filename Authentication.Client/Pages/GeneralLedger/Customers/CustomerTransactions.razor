@@ -1,0 +1,434 @@
+﻿@page "/GeneralLedger/Customers/transactions/{customerId:int}"
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.CustomerDTOs
+@using Shared.DTOs.Report
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+<PageTitle>تراکنش های مشتری</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+
+            <Modal @ref="modalRef"
+                   ConfirmationMessage="آیا از حذف این مورد مطمئن هستید؟"
+                   SubmitButtonText="حذف"
+                   OnConfirm="DeleteItem" />
+
+            <CustomToast />
+
+            @if (_initialLoading)
+            {
+                <LoadingProgress />
+            }
+            else
+            {
+                <div class="container mx-auto md:px-3">
+
+                    @if (_initialLoading)
+                    {
+                        <LoadingTitle Content="در حال بارگیری اطلاعات ..." />
+                    }
+                    else
+                    {
+                        <div class="container mx-auto md:px-3">
+                            <div class="shadow-md px-5 py-4 rounded-2xl mx-auto mt-2">
+                                @if (_loadingTransactions)
+                                {
+                                    <LoadingTitle Content="در حال بارگیری اطلاعات تراکنش..." />
+                                }
+
+                                else
+                                {
+                                    <div class="flex justify-around items-start">
+                                        <div class="flex flex-col gap-2">
+                                            <LoadingTitle Content="@Fullname" />
+                                            <h5 class="text-2xl font-bold text-gray-800 mb-2">جزئیات اطلاعات تراکنش ها</h5>
+                                        </div>
+                                        <div class="self-center">
+
+                                            <InfoButton ButtonWidth="8rem" ButtonType="button" Content="خرید/فروش ارز" IsDisabled="_isGridDisabled"
+                                                        OnClick="handleBuyAndSellCurrency" />
+                                        </div>
+                                    </div>
+
+                                    <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+
+
+
+
+                                    <div class="border rounded-lg shadow-sm bg-white overflow-hidden">
+                                        <div class="overflow-x-auto">
+                                            <QuickGrid Virtualize Class="w-full border-collapse quick-grid"
+                                                       Items="_customerTransactionsList.AsQueryable()"
+                                                       Pagination="paginationState">
+                                                <PropertyColumn Property="f => f.Value.CreatedDate.ToAfghanistanCalendarDate()"
+                                                                Title="تاریخ" Sortable="true" />
+
+                                                <PropertyColumn Property="f => f.Value.DepositOrWithdrawBy"
+                                                                Title="شرح" Sortable="true" Class="min-w-[15rem]" />
+
+                                                <TemplateColumn Title="مقدار">
+                                                    <div class="@(context.Value.Amount < 0 ? "text-red-500 px-2 py-1" : "text-green-500 px-2 py-1")">
+                                                        @Math.Abs(context.Value.Amount).ToFormattedDecimal()
+                                                    </div>
+                                                </TemplateColumn>
+
+                                                <PropertyColumn Property="f => Expressions.DealTypeDictionary[f.Value.DealType]"
+                                                                Title="نوع معامله" Class="text-center" />
+
+                                                <PropertyColumn Property="f => Expressions.TransactionTypeDictionary[f.Value.TransactionType]"
+                                                                Title="نوع تراکنش" Class="text-center" />
+
+                                                <TemplateColumn Title="نوع ارز" Class="">
+                                                    <div class="flex gap-3 justify-start items-center">
+
+                                                        <img src="@(_currenciesList[context.Value.CurrencyId].Image != null ? _currenciesList[context.Value.CurrencyId].Image.ConvertByteArrayToImage() : "images/defaultMoney.jpeg" )"
+                                                             class="w-7 h-7 object-cover rounded-full border-2 border-white" />
+                                                        <p>@_currenciesList[context.Value.CurrencyId].Name</p>
+                                                    </div>
+                                                </TemplateColumn>
+                                                @*  <PropertyColumn Property="f => f.Value.UserId"
+                                                            Title="کاربر عامل" Class="text-center" /> *@
+
+                                                <TemplateColumn Title="عملیات">
+                                                    <div class="flex gap-3 justify-start items-center">
+                                                        <EditIconButton Disabled="@_isGridDisabled"
+                                                                        Content="ویرایش" OnClick="EditItem"
+                                                                        Parameter="context.Value.TransactionId" />
+                                                        <DeleteIconButton Disabled="@_isGridDisabled"
+                                                                          Content="حذف" OnClick="OpenModal"
+                                                                          Parameter="context.Value.TransactionId" />
+                                                        <PrintIconButton Disabled="@_isGridDisabled"
+                                                                         Content="پرینت" OnClick="PrintItem"
+                                                                         Parameter="context.Value.TransactionId" />
+
+                                                    </div>
+                                                </TemplateColumn>
+                                            </QuickGrid>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pagination -->
+                                    <div class="mt-4">
+                                        <Paginator State="@paginationState" />
+                                    </div>
+
+                                    <style>
+                                        /* Add global table styling */
+                                        .quick-grid table {
+                                            border-spacing: 0;
+                                            width: 100%;
+                                        }
+
+                                        .quick-grid tr {
+                                            padding: 5px 0;
+                                        }
+
+                                            .quick-grid tr:hover {
+                                                background-color: #f8fafc;
+                                                cursor: pointer;
+                                            }
+
+                                        .quick-grid td {
+                                            border-bottom: 1px solid #e2e8f0;
+                                            padding: 0.75rem;
+                                            font-size: 1.2rem;
+                                        }
+
+                                        .quick-grid th {
+                                            background-color: #f1f5f9;
+                                            padding: 0.75rem;
+                                            font-weight: 600;
+                                            font-size: 1.2rem;
+                                            text-align: right;
+                                        }
+                                    </style>
+
+                                    <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+                                    <div class="shadow-sm bg-white rounded-xl p-5 overflow-x-auto border border-gray-200">
+                                        <h1 class="text-2xl font-bold text-gray-800 mb-2">محاسبه کل تراکنش های ارزها</h1>
+
+                                        <table class="min-w-full">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">ارز</th>
+                                                    <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">جمع برداشت</th>
+                                                    <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">جمع واریز</th>
+                                                    <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">باقیمانده</th>
+                                                    <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">وضعیت</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white">
+                                                @foreach (var currency in _transactionSummaryList)
+                                                {
+                                                    <tr class="group relative transition-all duration-150 ease-in-out hover:-translate-y-1
+                                                                hover:shadow-lg border-b border-gray-200 group-hover:opacity-100 rounded-lg
+                                                                hover:cursor-pointer even:bg-gray-100">
+
+                                                        <td class="px-5 py-4 flex justify-center text-gray-700 font-medium">
+                                                            <div class="flex items-center justify-between px-1 gap-1 min-w-[6rem] w-[6rem]">
+                                                                <div class="whitespace-nowrap"><p>@_currenciesList[currency.CurrencyId].Name</p></div>
+                                                                <img src="@(_currenciesList[currency.CurrencyId].Image?.ConvertByteArrayToImage() ?? "images/defaultMoney.jpeg")"
+                                                                     class="w-7 h-7 object-cover rounded-full border-2 border-white shrink-0">
+                                                            </div>
+                                                        </td>
+                                                        @if (currency.TotalWithdrawals == 0)
+                                                        {
+                                                            <td class="px-5 py-4 text-center text-2xl text-blue-500">0</td>
+                                                        }
+                                                        else
+                                                        {
+                                                            <td class="px-5 py-4 text-center text-red-500 font-medium">@Math.Abs(currency.TotalWithdrawals).ToFormattedDecimal()-</td>
+                                                        }
+                                                        @if (currency.TotalDeposits == 0)
+                                                        {
+                                                            <td class="px-5 py-4 text-center text-2xl text-blue-500 font-medium">0</td>
+                                                        }
+                                                        else
+                                                        {
+                                                            <td class="px-5 py-4 text-center text-green-500 font-medium">@currency.TotalDeposits.ToFormattedDecimal()</td>
+                                                        }
+                                                        <!--Reminder-->
+                                                        <td class="px-5 py-4 text-center font-medium">
+                                                            @if (currency.TotalDeposits + currency.TotalWithdrawals > 0)
+                                                            {
+                                                                <span class="text-green-500">
+                                                                    @((currency.TotalDeposits + currency.TotalWithdrawals).ToFormattedDecimal())
+                                                                </span>
+                                                            }
+                                                            else if (currency.TotalDeposits + currency.TotalWithdrawals == 0)
+                                                            {
+                                                                <span class="text-blue-500 text-2xl">
+                                                                    0
+                                                                    @* @((currency.TotalDeposits + currency.TotalWithdrawals).ToTwoDecimalPoints().ToThreeDigitWithComma()) *@
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-red-500">
+                                                                    @(Math.Abs((currency.TotalDeposits + currency.TotalWithdrawals)).ToFormattedDecimal())-
+                                                                </span>
+                                                            }
+                                                        </td>
+
+                                                        <td class="px-5 py-4 text-center font-medium">
+                                                            @if (currency.TotalDeposits - Math.Abs(currency.TotalWithdrawals) > 0)
+                                                            {
+                                                                <span class="text-green-500">طلبکار</span>
+                                                            }
+                                                            else if (currency.TotalDeposits - Math.Abs(currency.TotalWithdrawals) == 0)
+                                                            {
+                                                                <span class="text-blue-500 text-2xl">0</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-red-500">بدهکار</span>
+                                                            }
+                                                        </td>
+
+
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+@code {
+
+
+
+    [Parameter]
+    public int customerId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Fullname { get; set; }
+
+    private Modal modalRef;
+
+    private bool _initialLoading { get; set; }
+
+    private bool _isGridDisabled { get; set; }
+
+    private bool _loadingTransactions { get; set; }
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    private async Task DeleteItem()
+    {
+
+    }
+
+    private async Task EditItem(int transactionId)
+    {
+
+    }
+
+    private async Task OpenModal(int transactionId)
+    {
+
+    }
+
+    private async Task PrintItem(int transactionId)
+    {
+
+    }
+
+    private Dictionary<int, CustomerTransactionHistoryDTO> _customerTransactionsList { get; set; } = new();
+
+    private List<CurrencyTransactionSummary> _transactionSummaryList = new List<CurrencyTransactionSummary>();
+
+    void CalculateTotalOfTransaction()
+    {
+        // toastService.ShowInfo(DateTime.Now.Second.ToString());
+        _transactionSummaryList = _customerTransactionsList
+            .GroupBy(t => t.Value.CurrencyId)
+            .Select(group => new CurrencyTransactionSummary
+                {
+                    CurrencyId = group.Key,
+                    TotalDeposits = group.Where(t => t.Value.DealType == DealType.Deposit).Sum(t => t.Value.Amount),
+                    TotalWithdrawals = group.Where(t => t.Value.DealType == DealType.Withdraw).Sum(t => t.Value.Amount),
+                }).OrderBy(t => t.CurrencyId).ToList();
+        // toastService.ShowInfo(DateTime.Now.Second.ToString());
+
+    }
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 15 };
+
+
+    void handleBuyAndSellCurrency()
+    {
+        // @page "/RecieptsRegistration/CashBuyAndSell"
+        Navigation.NavigateTo($"/GeneralLedger/Customers/transactions/currencyExchange/{customerId}");
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private CancellationTokenSource? _cts = new();
+
+    async Task FetchCustomerTransactions()
+    {
+        try
+        {
+            _loadingTransactions = true;
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            string url = $"api/CustomerAccount/cutomerTransactions/{customerId}";
+
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+
+            var response = await _httpClient.GetFromJsonAsync
+            <ApiResponse<IEnumerable<CustomerTransactionHistoryDTO>>>(url, token);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerTransactions)]);
+                return;
+            }
+
+            // sort from newest to latest
+            var transactions = response.Data.OrderByDescending(transaction => transaction.CreatedDate).ToList();
+
+            _customerTransactionsList = transactions.ToDictionary(item => item.TransactionId, item => item);
+            CalculateTotalOfTransaction();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingTransactions = false;
+        }
+    }
+
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+    async Task FetchCurrencies()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            await FetchCustomerTransactions();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+        await FetchCurrencies();
+    }
+
+    #endregion
+
+}

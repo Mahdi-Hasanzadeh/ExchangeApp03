@@ -1,0 +1,89 @@
+﻿@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+@if (!_loading && CurrencyList is not null && CurrencyList.Count != 0)
+{
+    <InputSelect @bind-Value="selectedCurrency"
+    class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="0" selected>ارز را انتخاب کنید.</option>
+        @foreach (var currency in CurrencyList)
+        {
+            <option @key="currency.CurrencyId" value="@currency.CurrencyId">@currency.Name</option>
+        }
+    </InputSelect>
+}
+
+@code {
+    private bool _loading = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    // ✅ Two-way binding support
+    [Parameter]
+    public int BindValueTo { get; set; }
+
+    [Parameter]
+    public EventCallback<int> BindValueToChanged { get; set; }
+
+    private int selectedCurrency
+    {
+        get => BindValueTo;
+        set
+        {
+            if (BindValueTo != value)
+            {
+                BindValueTo = value;
+                BindValueToChanged.InvokeAsync(value); // Notify parent component
+            }
+        }
+    }
+
+    private List<CurrencyDTO> CurrencyList { get; set; } = new();
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _loading = true;
+
+            var authenticatedUser = await _state;
+            var _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                _loading = false;
+                StateHasChanged();
+                return;
+            }
+
+            var _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            var _jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            CurrencyList = response.Data.ToList();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedCurrency = BindValueTo;
+        await FetchCurrencies();
+    }
+}

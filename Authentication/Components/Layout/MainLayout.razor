@@ -1,0 +1,55 @@
+﻿@using Authentication.Client.Pages
+@using Authentication.Client.Pages.Account
+@using Authentication.Components.Pages
+@inherits LayoutComponentBase
+
+<CustomToast></CustomToast>
+
+<Layout />
+
+<main class="mx-4 my-4">
+    @Body
+</main>
+
+@code{
+
+}
+
+@*
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex align-items-center gap-2">
+            @* <CultureSelector /> 
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">@localizer[nameof(ResourceStrings.About)]</a>
+            <AuthorizeView>
+                <NotAuthorized>
+                    <div>
+                        <a href="/login">@localizer[nameof(ResourceStrings.LoginIntoAccount)]</a>
+                        <a href="/register">@localizer[nameof(ResourceStrings.Register)]</a>
+                    </div>
+                </NotAuthorized>
+                <Authorized>
+                    <CurrentUser />
+                    <a href="/logout">@localizer[nameof(ResourceStrings.Logout)]</a>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" dir="rtl">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+*@

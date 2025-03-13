@@ -1,0 +1,68 @@
+﻿.bi::before {
+    vertical-align: middle !important;
+}
+
+::deep table {
+    /*    width: 100%;*/
+    border-radius: 100px;
+    border-collapse: collapse;
+    border-radius: 20px !important;
+    background-color: #fbede4 !important; /* White background for the whole table */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Adds subtle shadow for depth */
+}
+
+::deep th {
+    color: black; /* Light text color for contrast */
+    text-align: center;
+    margin:0 auto;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+::deep td {
+    padding: 120px 20px; /* Adds consistent padding for table cells */
+    text-align: center;
+    border-bottom: 1px solid #f1f1f1; /* Light border between rows */
+}
+
+::deep tr:nth-child(odd) {
+    background-color: #f9fafc;
+    padding:1px;  /* Light color for odd rows */
+}
+
+::deep tr:nth-child(even) {
+    background-color: #e9ecef; /* Slightly darker color for even rows */
+    padding:1px;
+}
+
+::deep tr:hover {
+    background-color: #f1f1f1; /* Light gray hover effect */
+    background-color: #fbede4
+}
+
+::deep tr:last-child td {
+    border-bottom: none; /* Remove bottom border for the last row */
+}
+
+::deep .pagination {
+    margin-top: 20px;
+    justify-content: center;
+    display: flex;
+    gap: 10px;
+}
+
+    ::deep .pagination .page-item {
+        border-radius: 5px;
+    }
+
+    ::deep .pagination .page-link {
+        background-color: #3498db; /* Button background color */
+        color: white;
+        border-radius: 5px;
+        padding: 8px 15px;
+        font-size: 0.9em;
+    }
+
+        ::deep .pagination .page-link:hover {
+            background-color: #2980b9; /* Hover effect on page buttons */
+        }

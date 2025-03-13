@@ -1,0 +1,150 @@
+﻿@rendermode InteractiveWebAssembly
+@inject IUserRepository IUserRepo
+@using System.Security.Claims
+@using Authentication.Client.Repository.Interface
+
+
+
+@if (IsImageValid)
+{
+    <NavLink class="text-white rounded-full" href="/account/info">
+        <img src="@UserProfileImageUrl" width="35" height="35" class="rounded-full" />
+    </NavLink>
+
+}
+else
+{
+    <NavLink class="py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 md:hover:bg-transparent md:hover:text-blue-700 md:p-0 md:dark:hover:text-blue-500 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent"
+             href="/account/info">
+        @_username.ToUpper()
+    </NavLink>
+}
+
+@code {
+
+    #region Private Fields
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? _authenticationState { get; set; }
+
+    private string _username { get; set; } = string.Empty;
+
+    private bool IsImageValid { get; set; } = false;
+
+    private string UserProfileImageUrl { get; set; } = "https://lh3.googleusercontent.com/ogw/AF2bZyhtaf-6vWD_2CsBW9dqIA62G1Uaa-40FOLOO7mST12k3Q=s64-c-mo";
+
+    #endregion
+
+    #region Life Cycle Methods
+
+    private int _userId { get; set; }
+    private string? _jwtToken { get; set; }
+    private bool _isAuthenticated { get; set; }
+    private string _userRole;
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // _jwtToken = await JS.InvokeAsync<string>("localStorage.getItem", "jwt_token");
+
+            // if (string.IsNullOrEmpty(_jwtToken))
+            // {
+            //     Handle missing token (maybe redirect to login page)
+            //     Navigation.NavigateTo("/login");
+            //     return;
+            // }
+
+            // Add JWT token to the authorization header
+            // _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+            // var authenticatedUser = await _authenticationState;
+            // if (authenticatedUser.User.Identity.IsAuthenticated)
+            // {
+            //     await GetUserInformation();
+            //     await ShowUserPicture();
+            //     StateHasChanged();
+            // }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _authenticationState;
+        if (authenticatedUser.User.Identity.IsAuthenticated)
+        {
+            _username = authenticatedUser.User.FindFirst(ClaimTypes.Name)?.Value;
+            _userRole = authenticatedUser.User.FindFirst(ClaimTypes.Role)?.Value;
+            _userId = int.Parse(authenticatedUser.User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            _jwtToken = authenticatedUser.User.FindFirst("token")?.Value; // Retrieve JWT Token
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            await GetUserInformation();
+            await ShowUserPicture();
+        }
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private async Task GetUserInformation()
+    {
+        var authenticatedUser = await _authenticationState!;
+
+        var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+
+        string jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        var username = authenticatedUser.User.Identity!.Name;
+        _username = username!;
+
+        var url = $"api/User/{userId}";
+        try
+        {
+            // _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            // AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<UserEntity>>(url);
+
+            if (response.Success)
+            {
+                UserProfileImageUrl = response.Data.PictureUrl;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("401"))
+            {
+                Console.WriteLine(localizer[nameof(ResourceStringsError.Unauthorized)]);
+            }
+        }
+    }
+
+    private async Task ShowUserPicture()
+    {
+        if (!string.IsNullOrEmpty(UserProfileImageUrl))
+            IsImageValid = await ValidateImageUrlAsync(UserProfileImageUrl);
+    }
+
+    private async Task<bool> ValidateImageUrlAsync(string url)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Head, url);
+            var response = await _httpClient.SendAsync(request);
+
+            // Check if the response is successful and the content type is an image
+            return response.IsSuccessStatusCode &&
+                   response.Content.Headers.ContentType?.MediaType?.StartsWith("image/") == true;
+        }
+        catch
+        {
+            // If there's an exception (e.g., network issues), consider the image invalid
+            return false;
+        }
+    }
+
+    #endregion
+
+}

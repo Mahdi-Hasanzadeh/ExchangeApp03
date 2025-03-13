@@ -1,0 +1,308 @@
+﻿@page "/GeneralLedger/Customers/{customerId:int}"
+@using Shared.DTOs.CustomerDTOs
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+<PageTitle>ویرایش اطلاعات</PageTitle>
+
+<CustomToast />
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+
+            @if (_loadingCustomer)
+            {
+                <div class="max-w-6xl mx-auto shadow-lg rounded-lg p-6">
+                    <div class="flex items-center justify-center">
+                        <LoadingTitle Content="در حال بارگیری اطلاعات مشتری" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="max-w-6xl mx-auto shadow-lg rounded-lg p-6">
+
+                    <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">ویرایش اطلاعات مشتری</h2>
+
+                    <EditForm Model="@_customer" OnValidSubmit="HandleUpdateCustomer">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-red-500 text-sm mb-4" />
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Left Section (Form) -->
+                            <div>
+                                <div class="mb-4">
+                                    <label class="block text-gray-700">نام <span class="text-red-500">*</span></label>
+                                    <InputText @bind-Value="_customer.Firstname"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none " />
+                                    <ValidationMessage For="() => _customer.Firstname" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="mb-4">
+                                    <Label Content="تخلص" />
+                                    <InputText @bind-Value="_customer.Lastname"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                                    <ValidationMessage For="() => _customer.Lastname" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="mb-4">
+                                    <Label Content="سقف اعتبار (به دالر)" />
+                                    <InputNumber ParsingErrorMessage="عدد مورد نظر اشتباه است" @bind-Value="_customer.BorrowAmount"
+                                                 class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                                    <ValidationMessage For="() => _customer.BorrowAmount" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="mb-4">
+                                    <Label Content="شماره موبایل" />
+                                    <InputText @bind-Value="_customer.Mobile"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                                    <ValidationMessage For="() => _customer.Mobile" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <Label Content="شماره پاسپورت" />
+                                        <InputText @bind-Value="_customer.PassportNumber"
+                                                   class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                                        <ValidationMessage For="() => _customer.PassportNumber" class="text-red-500 text-sm" />
+                                    </div>
+                                    <div>
+                                        <Label Content="شماره تذکره" />
+                                        <InputText @bind-Value="_customer.IDCardNumber"
+                                                   class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none" />
+                                        <ValidationMessage For="() => _customer.IDCardNumber" class="text-red-500 text-sm" />
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Right Section (Image Upload) -->
+                            <div class="flex flex-col items-center justify-center gap-4">
+                                @if (!string.IsNullOrEmpty(_previewImage))
+                                {
+                                    <img src="@_previewImage" alt="پیش‌نمایش"
+                                         class="mt-4 rounded-lg shadow-md w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-cover border
+                                    transition-transform duration-300 hover:scale-105" />
+
+                                }
+                                else
+                                {
+                                    <Label Content="آپلود تصویر" />
+                                }
+
+                                <div class="flex flex-col items-center gap-2 ">
+                                    <UploadButton SelectedFileName="@_selectedFileName" OnChange="@HandleImageChange" />
+                                    @if (!string.IsNullOrEmpty(_previewImage))
+                                    {
+                                        <MdDangerButton ButtonType="button" Content="حذف تصویر" IsDisabled="_isDisabled" OnClick="RemoveImage" />
+                                    }
+                                </div>
+
+                            </div>
+
+                            <!-- Buttons at the bottom on small screens -->
+                            <div class="flex justify-start md:justify-center gap-4 mt-4 md:mt-0 md:flex-row">
+                                <MdSuccessButton ButtonWidth="8rem" IsDisabled="@_isDisabled" ButtonType="submit" Content="ویرایش" />
+                                <MdDangerButton ButtonWidth="8rem" IsDisabled="@_isDisabled" ButtonType="reset" OnClick="@ResetForm" Content="انصراف" />
+                            </div>
+                        </div>
+                    </EditForm>
+
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+@code {
+    [Parameter]
+    public int customerId { get; set; }
+
+    private bool _isDisabled { get; set; }
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    private bool _loadingCustomer { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    [SupplyParameterFromForm(FormName = "EditCustomer")]
+    private CustomerAccountDTO _customer { get; set; } = new();
+
+    private void RemoveImage()
+    {
+        _previewImage = null;
+        _customer.Image = null;
+        _selectedFileName = "هیچ فایلی انتخاب نشده است";
+    }
+
+    private async Task HandleUpdateCustomer()
+    {
+        try
+        {
+            _isDisabled = true;
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = $"api/CustomerAccount/customers/{customerId}";
+
+            var response = await _httpClient.PutAsJsonAsync(url, _customer);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+            if (!response.IsSuccessStatusCode || response == null)
+            {
+                toastService.ShowError(result.Message);
+                return;
+            }
+
+            if (result.Success)
+            {
+                toastService.ShowSuccess($"اطلاعات مشتری با موفقیت بروز رسانی شد");
+                await Task.Delay(3000);
+                Navigation.NavigateTo("/GeneralLedger/Customers");
+            }
+            else
+            {
+                toastService.ShowError(result.Message!);
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private async Task HandleImageChange(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+
+            // ✅ Update the displayed file name
+            _selectedFileName = file.Name;
+
+            // ✅ Validate Image Size (Max 5MB)
+            if (file.Size > 5 * 1024 * 1024)
+            {
+                toastService.ShowError("حجم تصویر نباید بیشتر از 5 مگابایت باشد.");
+                // _errorMessage = "حجم تصویر نباید بیشتر از 5 مگابایت باشد.";
+                _previewImage = null;
+                return;
+            }
+
+            // ✅ Read Image as Byte Array
+            using (var stream = new MemoryStream())
+            {
+                await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(stream);
+                _customer.Image = stream.ToArray();
+            }
+
+            // ✅ Generate Base64 Preview
+            _previewImage = $"data:{file.ContentType};base64,{Convert.ToBase64String(_customer.Image)}";
+
+            // _errorMessage = null; Clear error if successful
+            StateHasChanged(); // Ensure the UI updates after file selection
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("در آپلود تصویر خطای رخ داده است");
+        }
+
+    }
+
+    private void ResetForm()
+    {
+        // CustomerModel = new()
+        //     {
+        //         Name = string.Empty,
+        //         AccountType = eAccountType.Regular
+        //     };
+        _previewImage = null;
+        _selectedFileName = "هیچ فایلی انتخاب نشده است";
+        Navigation.NavigateTo("/GeneralLedger/Customers");
+    }
+
+    private string _selectedFileName = "هیچ فایلی انتخاب نشده است";
+
+    private string? _previewImage;
+
+    private async Task FetchCustomer()
+    {
+        try
+        {
+            _loadingCustomer = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch customer by customerId
+
+            string url = $"api/CustomerAccount/customers/{customerId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<CustomerAccountDTO>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerAccounts)]);
+                return;
+            }
+            _customer = response.Data!;
+            _customer.BorrowAmount = _customer.BorrowAmount.ToTwoDecimalPoints();
+            var byteArray = _customer.Image;
+            if (_customer.Image != null)
+            {
+                _previewImage = _customer.Image.ConvertByteArrayToImage();
+            }
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingCustomer = false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Console.WriteLine($"Customer ID: {customerId}");
+        if (customerId == 0)
+        {
+
+        }
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            // _initialLoading = false; Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCustomer();
+    }
+}

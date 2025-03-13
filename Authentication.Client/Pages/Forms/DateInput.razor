@@ -1,0 +1,21 @@
+﻿@rendermode InteractiveWebAssembly
+
+<InputDate @bind-Value="BindValueTo"
+           class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+
+@code {
+    [Parameter]
+    public DateTime BindValueTo { get; set; } = DateTime.Now; // Initialize with current date
+
+    [Parameter]
+    public EventCallback<DateTime> BindValueToChanged { get; set; } // Needed for two-way binding
+
+    private async Task OnDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
+        {
+            BindValueTo = newDate;
+            await BindValueToChanged.InvokeAsync(newDate); // Notify parent
+        }
+    }
+}

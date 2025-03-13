@@ -1,0 +1,11 @@
+﻿
+
+.customCard {
+    transition: all 0.65s ease-in !important;
+    cursor: pointer;
+}
+
+    .customCard:hover {
+        transform: scale(1.07);
+        border-radius: 0.775rem;
+    }

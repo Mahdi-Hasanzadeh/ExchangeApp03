@@ -1,0 +1,287 @@
+﻿@page "/GeneralLedger/Customers"
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.CustomerDTOs
+@using Shared.DTOs.TransactionsDTOs
+
+<PageTitle>دفتر کل / مشتریان</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <Modal @ref="modalRef"
+            ConfirmationMessage="آیا از حذف این مورد مطمئن هستید؟"
+            SubmitButtonText="حذف"
+            OnConfirm="DeleteItem" />
+            <CustomToast />
+
+            @if (_initialLoading)
+            {
+                <LoadingProgress />
+            }
+            else
+            {
+                <div class="container mx-auto md:px-3">
+
+                    @if (_initialLoading)
+                    {
+                        <LoadingTitle Content="در حال بارگیری اطلاعات ..." />
+                    }
+                    else
+                    {
+                        <div class="container mx-auto md:px-3">
+                            <div class="shadow-md px-5 py-4 rounded-2xl mx-auto mt-2">
+                                @if (_loadingCustomers)
+                                {
+                                    <LoadingTitle Content="در حال بارگیری اطلاعات تراکنش..." />
+                                }
+                                else
+                                {
+                                    <h5 class="text-2xl font-bold text-gray-800 mb-2">جزئیات اطلاعات مشتریان </h5>
+                                    <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                                    <div class="flex gap-4 justify-start items-center mb-1">
+                                        <div class="grid grid-cols-1 gap-4 mb-4 w-1/3 items-center">
+                                            <div class="">
+                                                <Label Content="اسم و تخلص،شماره حساب و موبایل" />
+                                                <InputText Value="@_customerName"
+                                                    ValueExpression="()=>_customerName"
+                                                @oninput="handleOnChange"
+                                                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                    <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                                    <div class="border rounded-lg shadow-sm bg-white overflow-hidden">
+                                        <div class="overflow-x-auto">
+                                            <QuickGrid Virtualize Class="w-full border-collapse quick-grid"
+                                            Items="_customersList.AsQueryable()"
+                                            Pagination="paginationState">
+                                                <PropertyColumn Property="f => f.Value.Fullname"
+                                                Title="نام و تخلص" Sortable="true" />
+
+                                                <PropertyColumn Property="f => f.Value.AccountNumber"
+                                                Title="شماره حساب" Sortable="true" />
+
+                                                <PropertyColumn Property="f => f.Value.Mobile"
+                                                Title="شماره موبایل" />
+
+                                                <PropertyColumn Property="f => f.Value.BorrowAmount.ToTwoDecimalPoints()"
+                                                Title="سقف اعتبار$" />
+
+                                                <PropertyColumn Property="f => f.Value.PassportNumber"
+                                                Title="شماره پاسپورت" />
+
+                                                <PropertyColumn Property="f => f.Value.IDCardNumber"
+                                                Title="شماره تذکره" />
+
+                                                <PropertyColumn Property="f => GetStatus(f.Value.IsActive)"
+                                                Title="وضعیت" Sortable="true" />
+
+                                                <TemplateColumn Title="تراکنش ها">
+                                                    <div class="flex gap-3 justify-start items-center">
+                                                        <SuccessIconButton Disabled="@_isGridDisabled"
+                                                        Content="جزئیات تراکنش‌ها" OnClick="TransactionDetails"
+                                                        ButtonWidth="8rem" Parameter="context.Value.Id" />
+                                                    </div>
+                                                </TemplateColumn>
+
+                                                <TemplateColumn Title="عملیات">
+                                                    <div class="flex gap-3 justify-start items-center">
+                                                        <EditIconButton Disabled="@_isGridDisabled"
+                                                        Content="ویرایش" OnClick="EditItem"
+                                                        Parameter="context.Value.Id" />
+                                                        <DeleteIconButton Disabled="@_isGridDisabled"
+                                                        Content="حذف" OnClick="OpenModal"
+                                                        Parameter="context.Value.Id" />
+                                                    </div>
+                                                </TemplateColumn>
+                                            </QuickGrid>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pagination -->
+                                    <div class="mt-4">
+                                        <Paginator State="@paginationState" />
+                                    </div>
+
+                                    <style>
+                                        /* Add global table styling */
+                                        .quick-grid table {
+                                        border-spacing: 0;
+                                        width: 100%;
+                                        }
+
+                                        .quick-grid tr {
+                                        padding: 5px 0;
+                                        }
+
+                                        .quick-grid tr:hover {
+                                        background-color: #f8fafc;
+                                        cursor: pointer;
+                                        }
+
+                                        .quick-grid td {
+                                        border-bottom: 1px solid #e2e8f0;
+                                        padding: 0.75rem;
+                                        font-size: 1.2rem;
+                                        }
+
+                                        .quick-grid th {
+                                        background-color: #f1f5f9;
+                                        padding: 0.75rem;
+                                        font-weight: 600;
+                                        font-size: 1.2rem;
+                                        text-align: right;
+                                        }
+                                    </style>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+@code {
+    public string _customerName { get; set; } = string.Empty;
+
+    private string GetStatus(bool isActive) => isActive ? "فعال" : "غیر فعال";
+
+    private bool _initialLoading { get; set; }
+
+    private bool _isGridDisabled { get; set; }
+
+    private bool _loadingCustomers { get; set; }
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private Modal modalRef;
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 15 };
+
+    private Dictionary<int, CustomerAccountDTO> _customersList { get; set; } = new();
+
+    private Dictionary<int, CustomerAccountDTO> _originalCustomersList { get; set; } = new();
+
+    private void handleOnChange(ChangeEventArgs e)
+    {
+        var filter = e.Value.ToString().Trim();
+        if (filter == null || filter.Length == 0)
+        {
+            _customersList = _originalCustomersList;
+            return;
+        }
+        _customersList = _originalCustomersList.Values
+        .Where(c => c.AccountNumber.ToString() == filter || c.Fullname.Contains(filter) || c.Mobile.Contains(filter))
+        .ToDictionary(item => item.Id, item => item);
+    }
+
+
+    private async Task DeleteItem()
+    {
+
+    }
+
+    private async Task EditItem(int customerId)
+    {
+        Navigation.NavigateTo($"/GeneralLedger/Customers/{customerId}");
+    }
+
+    private void TransactionDetails(int customerId)
+    {
+        var fullname = _customersList[customerId].Fullname;
+        var url = $"/GeneralLedger/Customers/transactions/{customerId}?Fullname={Uri.EscapeDataString(fullname)}";
+        Navigation.NavigateTo(url);
+    }
+
+    private async Task OpenModal(int customerId)
+    {
+
+    }
+
+    private async Task PrintItem(int customerId)
+    {
+
+    }
+
+    private async Task FetchCustomers()
+    {
+        try
+        {
+            _loadingCustomers = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All customers with name and Id
+
+            string url = $"api/CustomerAccount/{_userId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CustomerAccountDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerAccounts)]);
+                return;
+            }
+            _customersList = response.Data.ToDictionary(item => item.Id, item => item);
+            _originalCustomersList = _customersList;
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingCustomers = false;
+        }
+    }
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCustomers();
+    }
+
+    #endregion
+}

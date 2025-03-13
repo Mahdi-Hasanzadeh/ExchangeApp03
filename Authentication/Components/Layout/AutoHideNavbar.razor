@@ -1,0 +1,16 @@
+﻿<div @onmouseenter="HandleMouseEnter" @onmouseleave="HandleMouseLeave"
+     class="customContainer @(showSidebar ?"expand": "collapse")">
+    <h2>Hello world</h2>
+</div>
+@code {
+    private bool showSidebar { get; set; } = false;
+
+    private void HandleMouseEnter(MouseEventArgs e)
+    {
+        showSidebar = true;
+    }
+    private void HandleMouseLeave(MouseEventArgs e)
+    {
+        showSidebar = false;
+    }
+}

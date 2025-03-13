@@ -1,0 +1,129 @@
+﻿@* @inject IJSRuntime JS
+
+<div class="no-print">
+    <button @onclick="ShowPrintPreview" class="btn">Print Report</button>
+</div>
+
+@if (DataList != null && DataList.Any())
+{
+    <div id="printPreviewContent" class="container hidden">
+        <h3>@Title</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    @foreach (var prop in typeof(CustomerAccountSummaryDTO).GetProperties())
+                    {
+                        <th>@prop.Name</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in DataList)
+                {
+                    <tr>
+                        @foreach (var prop in typeof(CustomerAccountSummaryDTO).GetProperties())
+                        {
+                            <td>@prop.GetValue(item)</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Report";
+
+    [Parameter]
+    public List<CustomerAccountSummaryDTO> DataList { get; set; } = new();
+
+    private async Task ShowPrintPreview()
+    {
+        await JS.InvokeVoidAsync("printDiv", "printPreviewContent");
+    }
+}
+
+
+ *@
+
+                            @inject IJSRuntime JS
+
+<div class="no-print">
+    <button @onclick="ShowPrintPreview" class="btn">
+        <i class="fas fa-print"></i> Print Report
+    </button>
+</div>
+
+@if (DataList != null && DataList.Any())
+{
+    <div id="printPreviewContent" class="container hidden">
+        <h3>@Title</h3>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        @foreach (var prop in typeof(CustomerAccountSummaryDTO).GetProperties())
+                        {
+                            <th>@FormatHeader(prop.Name)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in DataList)
+                    {
+                        <tr>
+                            @foreach (var prop in typeof(CustomerAccountSummaryDTO).GetProperties())
+                            {
+                                <td>@FormatValue(prop.GetValue(item))</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-footer">
+            Generated on @DateTime.Now.ToString("dd MMMM yyyy") | Total Records: @DataList.Count
+        </div>
+    </div>
+}
+
+@code {
+    // ... existing code ...
+
+    [Parameter]
+    public string Title { get; set; } = "Report";
+
+    [Parameter]
+    public List<CustomerAccountSummaryDTO> DataList { get; set; } = new();
+
+    private async Task ShowPrintPreview()
+    {
+        await JS.InvokeVoidAsync("printDiv", "printPreviewContent");
+    }
+
+    private string FormatHeader(string header)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(header,
+            "([a-z])([A-Z])", "$1 $2");
+    }
+
+    private string FormatValue(object value)
+    {
+        switch (value)
+        {
+            case DateTime date:
+                return date.ToString("dd MMM yyyy");
+            case decimal dec:
+                return dec.ToString("C2");
+            case null:
+                return "N/A";
+            default:
+                return value.ToString();
+        }
+    }
+}

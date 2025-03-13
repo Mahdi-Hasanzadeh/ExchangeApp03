@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Authentication", "Authentication\Authentication.csproj", "{5416DA2D-8134-4338-B2C8-3031061B850D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Authentication.Client", "Authentication.Client\Authentication.Client.csproj", "{7F296A2C-613E-4E28-ADD0-FFDE8D0EE0DE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{ABCE8EF5-78C4-489E-B29B-E955797CBCB8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "API", "API\API.csproj", "{3F4164FC-1088-4524-8D5F-758C22009773}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5416DA2D-8134-4338-B2C8-3031061B850D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5416DA2D-8134-4338-B2C8-3031061B850D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5416DA2D-8134-4338-B2C8-3031061B850D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5416DA2D-8134-4338-B2C8-3031061B850D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F296A2C-613E-4E28-ADD0-FFDE8D0EE0DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F296A2C-613E-4E28-ADD0-FFDE8D0EE0DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F296A2C-613E-4E28-ADD0-FFDE8D0EE0DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F296A2C-613E-4E28-ADD0-FFDE8D0EE0DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABCE8EF5-78C4-489E-B29B-E955797CBCB8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABCE8EF5-78C4-489E-B29B-E955797CBCB8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABCE8EF5-78C4-489E-B29B-E955797CBCB8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABCE8EF5-78C4-489E-B29B-E955797CBCB8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F4164FC-1088-4524-8D5F-758C22009773}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F4164FC-1088-4524-8D5F-758C22009773}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F4164FC-1088-4524-8D5F-758C22009773}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F4164FC-1088-4524-8D5F-758C22009773}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

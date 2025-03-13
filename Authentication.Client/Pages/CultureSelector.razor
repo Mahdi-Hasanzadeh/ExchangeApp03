@@ -1,0 +1,58 @@
+﻿@using System.Globalization
+@using Authentication.Client.ClientAuthentication
+@inject HttpClientManager HttpClientManager
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+<CustomToast />
+
+<div>
+    <label>
+        @localizer[nameof(ResourceStrings.Language)]:
+        <select @bind="selectedCulture" @bind:after="ApplySelectedCultureAsync">
+            <option disabled>@localizer[nameof(ResourceStrings.SelectLanguage)]:</option>
+            @foreach (var culture in supportedCultures)
+            {
+                <option value="@culture">@culture.DisplayName</option>
+            }
+        </select>
+    </label>
+</div>
+
+@code
+{
+
+    #region Private Fields
+
+    private CultureInfo[] supportedCultures = new[]
+    {
+        new CultureInfo("en-US"),
+        new CultureInfo("fa"),
+    };
+
+    private CultureInfo? selectedCulture;
+
+    #endregion
+
+    #region Life Cycle Methods
+
+    protected override void OnInitialized()
+    {
+        selectedCulture = CultureInfo.CurrentCulture;
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private async Task ApplySelectedCultureAsync()
+    {
+        if (CultureInfo.CurrentCulture != selectedCulture)
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "culture", selectedCulture!.Name);
+            Helper.SetCultureInCookie(Navigation, selectedCulture);
+        }
+    }
+
+    #endregion
+  
+}

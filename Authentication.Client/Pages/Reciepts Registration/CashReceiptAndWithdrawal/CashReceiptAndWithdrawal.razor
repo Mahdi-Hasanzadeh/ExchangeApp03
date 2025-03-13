@@ -1,0 +1,899 @@
+﻿@page "/RecieptsRegistration/CashReceiptAndWithdrawal"
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+@inject IJSRuntime JS
+@implements IDisposable
+
+@using Authentication.Client.Pages.Customers
+@using Authentication.Client.Pages.GeneralLedger.Customers
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.CurrencyDTOs
+
+@* صفحه رسید و برد نقدی *@
+<PageTitle>رسید و برد نقدی</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <Modal @ref="modalRef"
+            ConfirmationMessage="آیا از حذف این مورد مطمئن هستید؟"
+            SubmitButtonText="حذف"
+            OnConfirm="DeleteItem" />
+
+            <CustomToast />
+
+            @if (_initialLoading)
+            {
+                <LoadingWithImage />
+            }
+            else
+            {
+                <CreateCustomer AddCustomerToList="AddNewCustomerToList" />
+
+                if (_currenciesList.Count > 0)
+                {
+                    <CustomerBalanceCard CurrenciesList="_currenciesList" CustomerId="@SelectedCustomerId"
+                    @ref="customerBalanceCard"
+                    @key="SelectedCustomerId"
+                    _currencyExchangeRate="_currencyExchangeRate" />
+                }
+
+                <div class="container mx-auto mt-4 mb-4 flex flex-row flex-wrap justify-around gap-4">
+
+                    @if (_initialLoading)
+                    {
+                        <LoadingTitle Content="در حال بارگیری اطلاعات ..." />
+                    }
+                    else
+                    {
+                        <div class="shadow-elevation-3 px-4 py-3 rounded-2xl w-2xl max-h-[53rem]"
+                        style="max-height: 53rem;
+                        overflow-y: auto;
+                        width: 36.5rem !important;
+                        min-width: 25.5rem;">
+                            <h5 class="text-slate-900 text-2xl">@(_updateTransactionMode ? "ویرایش تراکنش" : "افزودن تراکنش")</h5>
+                            <hr class="relative my-4 z-0 opacity-75 border-slate-500">
+
+                            <EditForm Model="@_customerTransactionModel"
+                            OnValidSubmit="HandleTransactionSubmit"
+                            FormName="TransactionForm">
+                                <DataAnnotationsValidator />
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 justify-items-between content-baseline">
+                                    <!-- Account Number -->
+                                    <div class="mb-4">
+                                        <label class="text-lg font-semibold mb-2">شماره حساب</label>
+                                        <InputSelect disabled="@_isGridDisabled" @bind-Value="SelectedCustomerId"
+                                        class="w-full border rounded-lg p-2
+                                             focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                            <option value="0" selected>شماره حساب را انتخاب کنید</option>
+                                            @foreach (var customer in _cutomersInfoList)
+                                            {
+                                                <option value="@customer.CustomerId">@customer.CustomerName-@customer.AccountNumber</option>
+                                            }
+                                        </InputSelect>
+                                        <ValidationMessage For="() => _customerTransactionModel.CustomerId" class="text-red-500 text-sm" />
+                                    </div>
+                                    <!-- Deal Type -->
+                                    <div class="grid grid-cols-1 bg-white w-full md:w-1/2 mx-auto">
+                                        <label class="text-lg font-semibold text-gray-700 text-center mb-3">نوع معامله</label>
+                                        <div class="flex justify-center gap-6">
+                                            <InputRadioGroup @bind-Value="_customerTransactionModel.DealType" class="flex space-x-6">
+                                                <label for="DEALTYPE_DEPOSIT"
+                                                class="flex items-center gap-2 cursor-pointer hover:bg-green-100 px-4 py-2 rounded-lg transition duration-200">
+                                                    <InputRadio Value="DealType.Deposit"
+                                                    class="form-radio text-green-500 focus:ring-2 focus:ring-green-400" id="DEALTYPE_DEPOSIT" />
+                                                    <span class="text-green-700 font-medium">رسید</span>
+                                                </label>
+
+                                                <label for="DEALTYPE_WITHDRAWAL" class="flex items-center gap-2 cursor-pointer hover:bg-red-100 px-4 py-2 rounded-lg transition duration-200">
+                                                    <InputRadio Value="DealType.Withdraw" class="form-radio text-red-500 focus:ring-2 focus:ring-red-400" id="DEALTYPE_WITHDRAWAL" />
+                                                    <span class="text-red-700 font-medium">برداشت</span>
+                                                </label>
+                                            </InputRadioGroup>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="mb-4">
+                                        <label class="block text-base font-medium mb-1">مبلغ پول</label>
+                                        <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                        @bind-Value="_customerTransactionModel.Amount"
+                                        class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        @oninput="UpdateAmount" />
+                                        <ValidationMessage For="() => _customerTransactionModel.Amount" class="text-red-500 text-sm" />
+                                        @if (_customerTransactionModel.Amount >= 0)
+                                        {
+                                            <strong>به حروف:</strong> @_amountInWords
+                                            @* @Expressions.CurrencyDictionary[_customerTransactionModel.CurrencyId] *@
+                                        }
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-base font-medium mb-1">ارز</label>
+                                        <InputSelect @bind-Value="_customerTransactionModel.CurrencyId" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                            <option value="0" selected>ارز را انتخاب کنید.</option>
+                                            @foreach (var currency in _currenciesList.Values)
+                                            {
+                                                //TODO: change the below code to select Currency Correctly
+                                                <option @key="currency.CurrencyId" value="@currency.CurrencyId">@currency.Name</option>
+                                            }
+                                        </InputSelect>
+                                        <ValidationMessage For="() => _customerTransactionModel.CurrencyId" class="text-red-500 text-sm" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-base font-medium mb-1">توسط</label>
+                                    <InputText @bind-Value="_customerTransactionModel.DepositOrWithdrawBy"
+                                    class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                    <ValidationMessage For="() => _customerTransactionModel.DepositOrWithdrawBy" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="mb-4">
+                                        <label class="block text-base font-medium mb-1">تاریخ</label>
+                                        <InputDate @bind-Value="_customerTransactionModel.CreatedDate"
+                                        class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                        <ValidationMessage For="() => _customerTransactionModel.CreatedDate" class="text-red-500 text-sm" />
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-base font-medium mb-1">سند</label>
+                                        <InputNumber ParsingErrorMessage="مبلغ به شکل درست وارد نشده است."
+                                        @bind-Value="_customerTransactionModel.DocumentNumber"
+                                        class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                        <ValidationMessage For="() => _customerTransactionModel.DocumentNumber" class="text-red-500 text-sm" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-base font-medium mb-1">تفصیلات</label>
+                                    <InputTextArea @bind-Value="_customerTransactionModel.Description"
+                                    class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                    <ValidationMessage For="() => _customerTransactionModel.Description" class="text-red-500 text-sm" />
+                                </div>
+
+                                <div class="mb-4 text-red-600">
+                                    <span>@errorMessage</span>
+                                </div>
+
+                                <div class="flex flex-column gap-2 ">
+                                    <MdSuccessButton IsDisabled="_isDisabled" ButtonType="submit" Content="@(_updateTransactionMode ? "بروز رسانی" : "ثبت")" />
+                                    <MdInfoButton IsDisabled="_isDisabled" ButtonType="submit" Content="@(_updateTransactionMode ? "بروز رسانی و چاپ" : "ثبت و چاپ")" />
+                                    <MdDangerButton IsDisabled="_isDisabled" ButtonType="button" OnClick="ResetTransactionForm" Content="انصراف" />
+                                </div>
+                            </EditForm>
+                        </div>
+                    }
+
+                    <div class="max-w-[800px] w-[800px] text-[1.2rem] overflow-auto shadow-md px-5 py-4 rounded-2xl bg-white">
+                        @if (_loadingCustomerTransactions)
+                        {
+                            <LoadingTitle Content="در حال بارگیری اطلاعات تراکنش..." />
+                        }
+                        else if (_customerTransactionsList.Count == 0)
+                        {
+                            <LoadingTitle Content="هیچ تراکنشی وجود ندارد." />
+                            <h3 class="text-center text-2xl font-semibold text-gray-600"></h3>
+                        }
+                        else
+                        {
+                            <h5 class="text-2xl font-bold text-gray-800 mb-2">آخرین تراکنش ها: (@_selectedCustomerFullName)</h5>
+                            <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                            <QuickGrid Virtualize Class="w-full border-collapse table-auto " Theme="default" Items="_customerTransactionsList.AsQueryable()" Pagination="paginationState">
+                                <PropertyColumn Property="f => Expressions.DealTypeDictionary[f.DealType]" Title="نوع" Sortable="true" />
+                                <PropertyColumn Property="f => f.Amount.ToTwoDecimalPoints()" Title="مقدار" />
+                                <PropertyColumn Property="f => _currenciesList[f.CurrencyId]!.Name" Title="ارز" Sortable="true" />
+                                <PropertyColumn Property="f => f.DepositOrWithdrawBy" Title="توسط" />
+                                <PropertyColumn Property="f => f.CreatedDate.ToAfghanistanCalendarDate()" Title="تاریخ" Sortable="true" />
+
+                                <!-- Actions Column -->
+                                <TemplateColumn Title="عملیه ها">
+                                    <div class="flex gap-2 justify-center">
+                                        @if (context.TransactionType == TransactionType.Normal)
+                                        {
+                                            <EditIconButton Disabled="@_isGridDisabled" Content="ویرایش" OnClick="EditItem" Parameter="context.TransactionId" ButtonWidth="4rem" />
+                                            <DeleteIconButton Disabled="@_isGridDisabled" Content="حذف" OnClick="OpenModal" Parameter="context.TransactionId" ButtonWidth="4rem" />
+                                            <PrintIconButton Disabled="@_isGridDisabled" Content="چاپ" OnClick="PrintItem" Parameter="context.TransactionId" ButtonWidth="4rem" />
+                                        }
+                                        else if (context.TransactionType == TransactionType.Transfer)
+                                        {
+                                            <PrintIconButton Disabled="@_isGridDisabled" Content="چاپ" OnClick="PrintItem" Parameter="context.TransactionId" ButtonWidth="4rem" />
+                                        }
+                                    </div>
+                                </TemplateColumn>
+                            </QuickGrid>
+
+                            <div class="mt-4">
+                                <Paginator State="@paginationState" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+@code {
+
+    #region private Fields
+
+    private Modal modalRef;
+
+    private bool _updateTransactionMode { get; set; } = false;
+
+    private int _transactionIdToDelete { get; set; }
+
+    CustomerBalanceCard customerBalanceCard { get; set; }
+
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+
+    public Dictionary<int, CurrencyDetailDTO> _currencyExchangeRate { get; set; } = new();
+
+    private CancellationTokenSource? _cts = new();
+
+    private string _amountInWords { get; set; } = string.Empty;
+
+    private int _selectedCustomerId;
+
+    private string _selectedCustomerFullName { get; set; } = string.Empty;
+
+    private int SelectedCustomerId
+    {
+        get => _selectedCustomerId;
+
+        set
+        {
+            if (_selectedCustomerId != value && value != 0)
+            {
+
+                _selectedCustomerId = value;
+                ResetTransactionForm();
+                // StateHasChanged(); Ensure UI refreshes
+                _ = InvokeAsync(ShowCustomerTransactions);
+            }
+        }
+    }
+
+    private int _userId { get; set; }
+    private string? _jwtToken { get; set; }
+    private bool _isAuthenticated { get; set; }
+
+    [SupplyParameterFromForm(FormName = "TransactionForm")]
+    private CustomerTransactionHistoryDTO _customerTransactionModel { get; set; } = new()
+        { DepositOrWithdrawBy = string.Empty, DealType = DealType.Deposit };
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 8 };
+
+    private List<CustomerAccountSummaryDTO> _cutomersInfoList { get; set; } = new();
+
+    private List<CustomerTransactionHistoryDTO> _customerTransactionsList { get; set; } = new();
+
+    private CustomerTransactionHistoryDTO _originalTransaction { get; set; }
+
+    private string errorMessage { get; set; } = string.Empty;
+
+    private bool _loadingCustomerTransactions = false;
+
+    private bool _initialLoading = false;
+
+    private bool _isDisabled { get; set; } = false;
+
+    private bool _isGridDisabled { get; set; } = false;
+
+    #endregion
+
+    #region private Methods
+
+    private async Task FetchCurrencyExchangeRate()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            int baseCurrencyId = _currenciesList.Where(c => c.Value.Code == "USD").FirstOrDefault().Key;
+
+            string url = $"api/Currency/currencyDetail/{baseCurrencyId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDetailDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            foreach (var item in response.Data)
+            {
+                item.ImageString = item.Image != null && item.Image.Length > 0 ?
+                item.Image.ConvertByteArrayToImage() : string.Empty;
+            }
+            _currencyExchangeRate = response.Data.ToDictionary(item => item.TargetCurrencyId, item => item);
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        _customerTransactionModel = null;
+        _customerTransactionsList?.Clear();
+        _currenciesList?.Clear();
+        _cutomersInfoList?.Clear();
+    }
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            await FetchCurrencyExchangeRate();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private void UpdateAmount(ChangeEventArgs e)
+    {
+        try
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out var amount))
+            {
+                _customerTransactionModel.Amount = amount;
+
+                var amountInWords = Helper.ConvertToPersianWords(_customerTransactionModel.Amount);
+
+                // var selectedCurreny = Expressions.CurrencyDictionary[_customerTransactionModel.Currency];
+
+                _amountInWords = $"{amountInWords} ";
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("عدد مورد نظر بیش از حد بزرگ است");
+        }
+
+    }
+
+    private void ResetTransactionForm()
+    {
+        _customerTransactionModel = new()
+            {
+                DepositOrWithdrawBy = string.Empty,
+                DealType = DealType.Deposit
+            };
+        _amountInWords = string.Empty;
+        _updateTransactionMode = false;
+        _isGridDisabled = false;
+        _originalTransaction = null;
+    }
+
+    private void AddNewCustomerToList(CustomerAccountSummaryDTO customerAccountSummaryDTO)
+    {
+        _cutomersInfoList.Add(customerAccountSummaryDTO);
+        StateHasChanged();
+    }
+
+    private async Task FetchCustomers()
+    {
+        try
+        {
+            _initialLoading = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All customers with name and Id
+
+            string url = $"api/CustomerAccount/CustomersSummary/{_userId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CustomerAccountSummaryDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerAccounts)]);
+                return;
+            }
+            _cutomersInfoList = response.Data.ToList();
+
+            await FetchCurrencies();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _initialLoading = false;
+        }
+    }
+
+    private async Task OpenModal(int transactionId)
+    {
+        _transactionIdToDelete = transactionId;
+        string customMessage = $"تراکنش مشتری {_selectedCustomerFullName} به صورت دایمی حذف میشود.";
+
+        await modalRef.ShowModal(customMessage);
+    }
+
+    private async Task DeleteItem()
+    {
+        try
+        {
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+
+            _isDisabled = true;
+            _isGridDisabled = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = $"api/CustomerTransaction/{_transactionIdToDelete}";
+            var response = await _httpClient.DeleteFromJsonAsync<ApiResponse<bool>>(url);
+            if (!response.Success || response == null)
+            {
+                toastService.ShowError(response.Message);
+                return;
+            }
+
+            var transactoion = _customerTransactionsList.FirstOrDefault(c => c.TransactionId == _transactionIdToDelete);
+            _customerTransactionsList.Remove(transactoion);
+            StateHasChanged();
+            await customerBalanceCard.UpdateCustomerBalanceLocallyAfterRemoveTransaction
+            (transactoion.CurrencyId, transactoion.Amount, transactoion.DealType);
+            toastService.ShowSuccess("تراکنش حذف شد.");
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+            _isGridDisabled = false;
+        }
+
+    }
+
+    private void EditItem(int id)
+    {
+        _isGridDisabled = true;
+        // JS.InvokeVoidAsync("alert", $"edit: {id}");
+        var transaction = _customerTransactionsList.FirstOrDefault(t => t.TransactionId == id);
+        _originalTransaction = new CustomerTransactionHistoryDTO()
+            {
+                DepositOrWithdrawBy = string.Empty,
+            };
+
+        if (transaction == null)
+        {
+            toastService.ShowError("تراکنش مشتری یافت نشد.");
+            return;
+        }
+
+        _originalTransaction = transaction;
+        _originalTransaction.Amount = _originalTransaction.Amount.ToTwoDecimalPoints();
+        _customerTransactionModel = transaction.DeepClone();
+        _customerTransactionModel.Amount = _customerTransactionModel.Amount.ToTwoDecimalPoints();
+        // _customerTransactionModel.Description = "kasdjf;klsajdf";
+        _updateTransactionMode = true;
+        _amountInWords = Helper.ConvertToPersianWords(_originalTransaction.Amount);
+
+    }
+
+    private void PrintItem(int id)
+    {
+        JS.InvokeVoidAsync("alert", $"print: {id}");
+    }
+
+    private async Task HandleTransactionSubmit()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+        if (!_isAuthenticated)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[ErrorList.NotAuthenticated.ToString()]);
+            return;
+        }
+        _isDisabled = true;
+        _isGridDisabled = true;
+        if (_updateTransactionMode)
+        {
+            await UpdateCustomerTransaction();
+        }
+        else
+        {
+            await SaveCustomerTransaction();
+        }
+        _isDisabled = false;
+        _isGridDisabled = false;
+    }
+
+    private async Task UpdateCustomerTransaction()
+    {
+        var dealTypeChanged = _customerTransactionModel.DealType != _originalTransaction.DealType;
+        var amountChanged = _customerTransactionModel.Amount != _originalTransaction.Amount;
+        var currencyChanged = _customerTransactionModel.CurrencyId != _originalTransaction.CurrencyId;
+        var DescritptionChanged = _customerTransactionModel.Description != _originalTransaction.Description;
+        var DocumentNumberChanged = _customerTransactionModel.DocumentNumber != _originalTransaction.DocumentNumber;
+        var DateChanged = _customerTransactionModel.CreatedDate.ToShortDateString() != _originalTransaction.CreatedDate.ToShortDateString();
+        var transactionBy = _customerTransactionModel.DepositOrWithdrawBy != _originalTransaction.DepositOrWithdrawBy;
+
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+        AuthenticationHeaderValue("Bearer", _jwtToken);
+
+        var url = $"api/CustomerAccount/";
+        CustomerTransactionHistoryDTO oldTransaction = null;
+        try
+        {
+            if (!dealTypeChanged && !amountChanged && !currencyChanged
+       && !DescritptionChanged && !DocumentNumberChanged && !DateChanged && !transactionBy)
+            {
+                toastService.ShowInfo("هیچ تغییری در تراکنش بوجود نیامده است.");
+                return;
+            }
+            else if ((DescritptionChanged || DocumentNumberChanged || DateChanged || transactionBy)
+            && (!dealTypeChanged && !amountChanged && !currencyChanged))
+            {
+                url += $"updateTransactionDetails/{_customerTransactionModel.TransactionId}";
+                // only update description,documentNumber and date, deal by
+
+                var response = await _httpClient.PutAsJsonAsync(url, _customerTransactionModel);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+
+                if (transaction.Success)
+                {
+                    toastService.ShowSuccess($"تراکنش با موفقیت بروز رسانی شد");
+                    // update transaction locally
+                    oldTransaction = _customerTransactionsList.FirstOrDefault(t => t.TransactionId == _customerTransactionModel.TransactionId);
+                    oldTransaction.UpdatedDate = DateTime.Now;
+                    oldTransaction.CreatedDate = _customerTransactionModel.CreatedDate;
+                    oldTransaction.DepositOrWithdrawBy = _customerTransactionModel.DepositOrWithdrawBy;
+                    oldTransaction.Description = _customerTransactionModel.Description;
+                    oldTransaction.DocumentNumber = _customerTransactionModel.DocumentNumber;
+
+                    ResetTransactionForm();
+                    StateHasChanged();
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+
+            //only amount has been changed
+            // update amount,description,date,documentNumber
+
+            // else if (amountChanged && !dealTypeChanged && !currencyChanged)
+            // {
+            //     oldTransaction = _customerTransactionsList.FirstOrDefault(t => t.TransactionId == _customerTransactionModel.TransactionId);
+            //     decimal newAmount = 0;
+            //     decimal oldAmount = 0;
+            //     decimal amountToUpdateBalance = 0;
+            //     if (oldTransaction.DealType == DealType.Withdraw)
+            //     {
+            //         newAmount = -(_customerTransactionModel.Amount);
+            //         oldAmount = oldTransaction.Amount;
+            //         amountToUpdateBalance = oldAmount - newAmount;
+            //     }
+            //     else
+            //     {
+            //         newAmount = _customerTransactionModel.Amount;
+            //         oldAmount = oldTransaction.Amount;
+            //         amountToUpdateBalance = newAmount - oldAmount;
+            //     }
+
+            //     _customerTransactionModel.NewAmountToUpdateBalance = amountToUpdateBalance;
+            //     _customerTransactionModel.NewAmountToUpdateTransaction = newAmount;
+
+            //     url += $"updateTransactionAmount/{_customerTransactionModel.TransactionId}";
+            //     // only update description,documentNumber and date, deal by
+
+            //     var response = await _httpClient.PutAsJsonAsync(url, _customerTransactionModel);
+            //     var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+            //     if (!response.IsSuccessStatusCode || response == null)
+            //     {
+            //         toastService.ShowError(transaction.Message);
+            //         return;
+            //     }
+
+            //     if (transaction.Success)
+            //     {
+            //         // update transaction locally
+
+            //         // balance = 10000,
+            //         // oldamount = 5000
+            //         // newamount = 4000
+            //         // 4000    -  5000  = -1000
+            //         // newamount - oldamount
+            //         await customerBalanceCard.UpdateCustomerBalanceLocally
+            //         (_customerTransactionModel.CurrencyId, amountToUpdateBalance, oldTransaction.DealType);
+
+            //         oldTransaction.UpdatedDate = DateTime.Now;
+            //         oldTransaction.CreatedDate = _customerTransactionModel.CreatedDate;
+            //         oldTransaction.DepositOrWithdrawBy = _customerTransactionModel.DepositOrWithdrawBy;
+            //         oldTransaction.Description = _customerTransactionModel.Description;
+            //         oldTransaction.DocumentNumber = _customerTransactionModel.DocumentNumber;
+            //         oldTransaction.Amount = newAmount;
+
+            //         ResetTransactionForm();
+            //         StateHasChanged();
+            //         toastService.ShowSuccess($"تراکنش با موفقیت بروز رسانی شد");
+            //         // await customerBalanceCard.FetchCustomerBalance();
+
+            //     }
+            //     else
+            //     {
+            //         toastService.ShowError(transaction.Message);
+            //     }
+            // }
+
+            // if dealtype changed or currency changed
+            // rollbacktransaction, update amount, description,dealBy, dealType,currency
+            else
+            {
+
+                oldTransaction = _customerTransactionsList.FirstOrDefault(t => t.TransactionId == _customerTransactionModel.TransactionId);
+
+                url += $"updateTransaction/{_customerTransactionModel.TransactionId}";
+                // only update description,documentNumber and date, deal by
+
+                var response = await _httpClient.PutAsJsonAsync(url, _customerTransactionModel);
+                var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(transaction.Message);
+                    return;
+                }
+
+                if (transaction.Success)
+                {
+                    // Remove amount from balance
+
+                    await customerBalanceCard.DecreaseBalance(oldTransaction.CurrencyId, oldTransaction.Amount, oldTransaction.DealType);
+
+                    // Add amount to balance
+                    await customerBalanceCard.IncreaseBalance(_customerTransactionModel.CurrencyId,
+                        _customerTransactionModel.Amount, _customerTransactionModel.DealType);
+
+                    oldTransaction.CurrencyId = _customerTransactionModel.CurrencyId;
+                    oldTransaction.UpdatedDate = DateTime.Now;
+                    oldTransaction.CreatedDate = _customerTransactionModel.CreatedDate;
+                    oldTransaction.CustomerId = _customerTransactionModel.CustomerId;
+                    oldTransaction.DocumentNumber = _customerTransactionModel.DocumentNumber;
+                    oldTransaction.Amount = _customerTransactionModel.DealType == DealType.Withdraw ?
+                    -(_customerTransactionModel.Amount) : _customerTransactionModel.Amount;
+                    oldTransaction.DealType = _customerTransactionModel.DealType;
+                    oldTransaction.DepositOrWithdrawBy = _customerTransactionModel.DepositOrWithdrawBy;
+                    oldTransaction.Description = _customerTransactionModel.Description;
+                    // oldTransaction.TransactionType = TransactionType.Normal;
+
+                    ResetTransactionForm();
+                    StateHasChanged();
+                    toastService.ShowSuccess($"تراکنش با موفقیت بروز رسانی شد");
+                    // await customerBalanceCard.FetchCustomerBalance();
+                }
+                else
+                {
+                    toastService.ShowError(transaction.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task SaveCustomerTransaction()
+    {
+        try
+        {
+            if (_selectedCustomerId == 0)
+            {
+                toastService.ShowError("لطفا شماره حساب مشتری را انتخاب کنید.");
+                return;
+            }
+            _customerTransactionModel.CustomerId = _selectedCustomerId;
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = "api/CustomerAccount/addTransaction";
+
+            var response = await _httpClient.PostAsJsonAsync(url, _customerTransactionModel);
+            var transaction = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+            if (!response.IsSuccessStatusCode || response == null)
+            {
+                toastService.ShowError(transaction.Message);
+                return;
+            }
+
+            if (transaction.Success)
+            {
+                _customerTransactionModel.TransactionId = transaction.Data;
+                if (_customerTransactionModel.DealType == DealType.Withdraw)
+                {
+                    _customerTransactionModel.Amount = -_customerTransactionModel.Amount;
+                }
+                _customerTransactionsList.Add(_customerTransactionModel);
+
+
+                if (_customerTransactionModel.DealType == DealType.Deposit)
+                {
+                    await customerBalanceCard
+                    .IncreaseBalance(_customerTransactionModel.CurrencyId, _customerTransactionModel.Amount, DealType.Deposit);
+                }
+                else
+                {
+                    await customerBalanceCard
+                    .DecreaseBalance(_customerTransactionModel.CurrencyId, _customerTransactionModel.Amount, DealType.Deposit);
+                    customerBalanceCard.CalculateTotalBalance();
+                }
+                ResetTransactionForm();
+                toastService.ShowSuccess($"تراکنش با موفقیت ثبت شد");
+                StateHasChanged();
+            }
+            else
+            {
+                toastService.ShowError(transaction.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task FetchCustomerTransactions()
+    {
+        try
+        {
+            _isDisabled = true;
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            string url = $"api/CustomerAccount/cutomerTransactions/{_selectedCustomerId}";
+
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+
+            var response = await _httpClient.GetFromJsonAsync
+            <ApiResponse<IEnumerable<CustomerTransactionHistoryDTO>>>(url, token);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerTransactions)]);
+                return;
+            }
+
+            // sort from newest to latest
+            var transactions = response.Data.OrderByDescending(transaction => transaction.CreatedDate).ToList();
+
+            _customerTransactionsList = transactions;
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private void UpdateSelectCustomerFullname()
+    {
+        var selectedCustomer = _cutomersInfoList.FirstOrDefault(c => c.CustomerId == SelectedCustomerId);
+        if (selectedCustomer == null)
+        {
+            _selectedCustomerFullName = string.Empty;
+        }
+        else
+        {
+            _selectedCustomerFullName = $"{selectedCustomer.CustomerName} {selectedCustomer.CustomerLastname}";
+        }
+    }
+
+    private async Task ShowCustomerTransactions()
+    {
+        if (SelectedCustomerId == 0) return;
+
+        // Fetch transactions for the selected customer
+        _loadingCustomerTransactions = true;
+
+        UpdateSelectCustomerFullname();
+
+        await FetchCustomerTransactions();
+
+        _loadingCustomerTransactions = false;
+
+        // Ensure UI updates
+        StateHasChanged();
+    }
+
+    #endregion
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+                                     // toastService.ShowError(Helper.ErrorsDictionary[ErrorList.NotAuthenticated.ToString()]);
+            StateHasChanged(); // Force UI update
+            return;
+        }
+
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCustomers();
+    }
+
+    #endregion
+
+}

@@ -1,0 +1,394 @@
+﻿@page "/GeneralLedger/DeptorsList"
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Shared.DTOs.CustomerDTOs
+@using Shared.DTOs.GeneralLedgerDTOs
+@using Shared.DTOs.Report
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+<PageTitle>لیست بدهکاران</PageTitle>
+
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <div class="container mx-auto md:px-3">
+                @if (_initialLoading)
+                {
+                    <LoadingTitle Content="در حال بارگیری اطلاعات ..." />
+                }
+                else
+                {
+                    <div class="container mx-auto md:px-3">
+                        <div class="shadow-md px-5 py-4 rounded-2xl mx-auto mt-2">
+                            @if (_loadingTransactions)
+                            {
+                                <LoadingTitle Content="در حال بارگیری لیست بدهکاران..." />
+                            }
+
+                            else
+                            {
+
+                                <h5 class="text-2xl font-bold text-gray-800 mb-2">لیست بدهکاران</h5>
+                                <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                                <div class="flex gap-4 justify-around items-center mb-1">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 w-1/2 items-center">
+                                        <div class="">
+                                            <Label Content="نوع ارز" />
+                                            <InputSelectCurrencyMapping FirstOption="همه" CurrencyList="_currenciesList"
+                                            @bind-BindValueTo="_selectedCurrency" />
+                                        </div>
+                                        <div class="">
+                                            <Label Content="اسم و تخلص" />
+                                            <InputText @bind-Value="customerName"
+                                            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+                                    <div class="mr-auto">
+                                        <MdSuccessButton ButtonType="button"
+                                        ButtonWidth="8rem"
+                                        IsDisabled="_isDisabled"
+                                        Content="اعمال فیلتر"
+                                        OnClick="handleFilter" />
+                                    </div>
+                                </div>
+
+                                <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+
+                                <div class="border rounded-lg shadow-sm bg-white overflow-hidden">
+                                    <div class="overflow-x-auto">
+
+                                        <QuickGrid Virtualize Class="w-full border-collapse quick-grid"
+                                        Items="_transactionsList.Count != 0 ? _transactionsList.AsQueryable() : Enumerable.Empty<GeneralListDTO>().AsQueryable()"
+                                        Pagination="paginationState">
+
+                                            <PropertyColumn Property="f => f.AccountNumber"
+                                            Title="شماره حساب" Sortable="true" Class="w-[6rem]" />
+
+                                            <PropertyColumn Property="f => f.Fullname"
+                                            Title="اسم و تخلص" Sortable="true" />
+                                            <PropertyColumn Property="f => f.Mobile"
+                                            Title="شماره موبایل" Sortable="true" />
+
+                                            <TemplateColumn Title="نوع ارز">
+                                                <div class="flex gap-3 justify-start items-center">
+                                                    <img src="@(context.CurrencyImage != null ? context.CurrencyImage.ConvertByteArrayToImage() : "images/defaultMoney.jpeg" )"
+                                                    class="w-7 h-7 object-cover rounded-full border-2 border-white" />
+                                                    <p>@context.CurrencyName</p>
+                                                </div>
+                                            </TemplateColumn>
+
+                                            <TemplateColumn Title="باقیمانده">
+                                                <div class="@(context.Reminder < 0 ? "text-red-500 px-2 py-1" : context.Reminder == 0 ? "text-blue-500 text-2xl px-2 py-1" : "text-green-500 px-2 py-1")">
+                                                    @Math.Abs(context.Reminder).ToFormattedDecimal() @(context.Reminder < 0 ? "-" : "")
+                                                </div>
+                                            </TemplateColumn>
+
+                                            <TemplateColumn Title="وضعیت">
+                                                <div class="@(context.Reminder < 0 ? "text-red-500 px-2 py-1" : context.Reminder == 0 ? "text-blue-500 text-2xl px-2 py-1" : "text-green-500 px-2 py-1")">
+                                                    @(context.Reminder < 0 ? "بدهکار" : context.Reminder == 0 ? "0" : "طلبکار")
+                                                </div>
+                                            </TemplateColumn>
+
+
+                                        </QuickGrid>
+                                    </div>
+                                </div>
+
+                                <!-- Pagination -->
+                                <div class="mt-4">
+                                    <Paginator State="@paginationState" />
+                                </div>
+
+                                <style>
+                                    /* Add global table styling */
+                                    .quick-grid table {
+                                    border-spacing: 0;
+                                    width: 100%;
+                                    }
+
+                                    .quick-grid tr {
+                                    padding: 5px 0;
+                                    }
+
+                                    .quick-grid tr:hover {
+                                    background-color: #f8fafc;
+                                    cursor: pointer;
+                                    }
+
+                                    .quick-grid td {
+                                    border-bottom: 1px solid #e2e8f0;
+                                    padding: 0.75rem;
+                                    font-size: 1.2rem;
+                                    }
+
+                                    .quick-grid th {
+                                    background-color: #f1f5f9;
+                                    padding: 0.75rem;
+                                    font-weight: 600;
+                                    font-size: 1.2rem;
+                                    text-align: right;
+                                    }
+                                </style>
+
+                                <hr class="my-4 border-t-2 border-gray-300 opacity-50" />
+                                <div class="shadow-sm bg-white rounded-xl p-5 overflow-x-auto border border-gray-200">
+                                    <h1 class="text-2xl font-bold text-gray-800 mb-2">محاسبه کل تراکنش های ارزها</h1>
+
+                                    <table class="min-w-full">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-3 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">ارز</th>
+                                                <th class="px-3 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">باقیمانده</th>
+                                                <th class="px-3 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">وضعیت</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white">
+                                            @foreach (var currency in _currencyTransactionSummary)
+                                            {
+                                                <tr class="group relative transition-all duration-150 ease-in-out hover:-translate-y-1
+                                                                hover:shadow-lg border-b border-gray-200 group-hover:opacity-100 rounded-lg
+                                                                hover:cursor-pointer even:bg-gray-100">
+
+                                                    <td class="px-5 py-4 flex justify-center text-gray-700 font-medium">
+                                                        <div class="flex items-center justify-between px-1 gap-1 min-w-[6rem] w-[6rem]">
+                                                            <div class="whitespace-nowrap"><p>@currency.CurrencyName</p></div>
+                                                            <img src="@(currency.CurrencyImage?.ConvertByteArrayToImage() ?? "images/defaultMoney.jpeg")"
+                                                            class="w-7 h-7 object-cover rounded-full border-2 border-white shrink-0">
+                                                        </div>
+                                                    </td>
+                                                    <!--Reminder-->
+                                                    <td class="px-5 py-4 text-center font-medium">
+                                                        @if (currency.Reminder > 0)
+                                                        {
+                                                            <span class="text-green-500">
+                                                                @currency.Reminder.ToFormattedDecimal()
+                                                            </span>
+                                                        }
+                                                        else if (currency.Reminder == 0)
+                                                        {
+                                                            <span class="text-blue-500 text-2xl">
+                                                                0
+                                                            </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-red-500">
+                                                                @(Math.Abs(currency.Reminder).ToFormattedDecimal())-
+                                                            </span>
+                                                        }
+                                                    </td>
+
+                                                    <td class="px-5 py-4 text-center font-medium">
+                                                        @if (currency.Reminder > 0)
+                                                        {
+                                                            <span class="text-green-500">طلبکار</span>
+                                                        }
+                                                        else if (currency.Reminder == 0)
+                                                        {
+                                                            <span class="text-blue-500 text-2xl">0</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-red-500">بدهکار</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </Authorized>
+    </AuthorizeView>
+}
+
+
+@code {
+    private string customerName { get; set; } = string.Empty;
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+
+    async Task FetchCurrencies()
+    {
+        try
+        {
+            _loadingTransactions = true;
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            await FetchTransactions();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingTransactions = false;
+        }
+    }
+
+    async Task handleFilter()
+    {
+        _isDisabled = true;
+        await FetchTransactions();
+        _isDisabled = false;
+    }
+
+    private bool _isDisabled { get; set; }
+
+    private bool _initialLoading { get; set; }
+
+    private bool _loadingTransactions { get; set; }
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+    private List<GeneralListDTO> _transactionsList { get; set; } = new();
+    // private Dictionary<int, GeneralListDTO> _transactionsList { get; set; } = new();
+
+    private List<CurrencyTransactionSummary> _currencyTransactionSummary = new List<CurrencyTransactionSummary>();
+
+    void CalculateTotalOfTransaction()
+    {
+        // toastService.ShowInfo(DateTime.Now.Second.ToString());
+        _currencyTransactionSummary = _transactionsList
+            .GroupBy(t => t.CurrencyId)
+            .Select(group => new CurrencyTransactionSummary
+                {
+                    CurrencyId = group.Key,
+                    CurrencyImage = group.FirstOrDefault()?.CurrencyImage,
+                    CurrencyName = group.FirstOrDefault()?.CurrencyName,
+                    // TotalDeposits = group.Where(t => t.DealType == DealType.Deposit).Sum(t => t.Value.Amount),
+                    // TotalWithdrawals = group.Where(t => t.DealType == DealType.Withdraw).Sum(t => t.Value.Amount),
+                    Reminder = group.Sum(balance => balance.Reminder)
+                }).OrderBy(t => t.CurrencyId).ToList();
+        // toastService.ShowInfo(DateTime.Now.Second.ToString());
+
+    }
+
+    private PaginationState paginationState = new PaginationState { ItemsPerPage = 15 };
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private CancellationTokenSource? _cts = new();
+
+    private int _selectedCurrency { get; set; } = 0;
+
+    async Task FetchTransactions()
+    {
+        try
+        {
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            // string url = $"api/CustomerAccount/balances?currencyId=1";
+            string url = $"api/CustomerAccount/balances?isDeptor=true";
+            url += $"&currencyId={(_selectedCurrency == 0 ? null : _selectedCurrency)}";
+            url += $"&customerName={(customerName == string.Empty ? null : customerName.Trim())}";
+            // if (_selectedCurrency != 0)
+            // {
+            //     url += $"?currencyId={_selectedCurrency}";
+            // }
+
+            // url += $"&isDeptor=true";
+
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+
+            var response = await _httpClient.GetFromJsonAsync
+            <ApiResponse<IEnumerable<GeneralListDTO>>>(url, token);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerTransactions)]);
+                return;
+            }
+
+            _transactionsList = response.Data.ToList();
+
+            CalculateTotalOfTransaction();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+
+    #region Life Cycles
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+
+            // If JS is available, we are in WebAssembly mode
+            // await JS.InvokeVoidAsync("console.log", "JS is available in Blazor WebAssembly!");
+            // await Task.Delay(1000);
+            // IsPrerendering = false;
+            // StateHasChanged();
+            var authenticatedUser = await _state;
+            _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                _initialLoading = false; // Set this early
+                StateHasChanged(); // Force UI update
+                return;
+            }
+
+            _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            _jwtToken = authenticatedUser.ExtractJWTFromToken();
+            await FetchCurrencies();
+        }
+        catch
+        {
+            // If an exception occurs, JS is not available (likely prerendering)
+            // IsPrerendering = true;
+        }
+    }
+
+    #endregion
+
+}

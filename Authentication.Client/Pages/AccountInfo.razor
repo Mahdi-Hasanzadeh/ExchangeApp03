@@ -1,0 +1,278 @@
+﻿@page "/account/info"
+@rendermode InteractiveWebAssembly
+@using Authentication.Client.Pages.Forms
+@using Microsoft.AspNetCore.Authorization
+@using Shared.View_Model
+@inject IJSRuntime JS
+@* @attribute [Authorize] *@
+
+<CustomToast />
+<EditForm Model="@Model" OnValidSubmit="UpdateAccount" FormName="UpdateForm"
+class="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md">
+    <h3 class="text-2xl text-center text-slate-900">اطلاعات کاربری</h3>
+
+    <DataAnnotationsValidator />
+    <div class="space-y-4">
+        <!-- Username -->
+        <div>
+            <Label Content="نام کاربری" />
+            <InputText @bind-Value="Model.Username"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                            placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+            <ValidationMessage For="() => Model.Username"
+            class="mt-1 text-sm text-red-600" />
+        </div>
+
+        <!-- Password -->
+        <div>
+            <Label Content="رمز" />
+            <InputText @bind-Value="Model.Password"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                            placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+            <ValidationMessage For="() => Model.Password"
+            class="mt-1 text-sm text-red-600" />
+        </div>
+
+        <!-- Email -->
+        <div>
+            <Label Content="ایمیل" />
+            <InputText @bind-Value="Model.Email"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                            placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+            <ValidationMessage For="() => Model.Email"
+            class="mt-1 text-sm text-red-600" />
+        </div>
+
+        <!-- Picture URL -->
+        <div>
+            <Label Content="عکس" />
+            <InputText @bind-Value="Model.PictureUrl"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                            placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+            <ValidationMessage For="() => Model.PictureUrl"
+            class="mt-1 text-sm text-red-600" />
+        </div>
+
+        <!-- Error Message -->
+        <div class="p-3 bg-red-50 rounded-lg border border-red-200"
+        style="@(string.IsNullOrEmpty(errorMessage) ? "display:none;" : "")">
+            <span class="text-red-600 text-sm">@errorMessage</span>
+        </div>
+
+        <!-- Success Message -->
+        <div class="p-3 bg-green-50 rounded-lg border border-green-200"
+        style="@(string.IsNullOrEmpty(successMessage) ? "display:none;" : "")">
+            <span class="text-green-600 text-sm">@successMessage</span>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit"
+        class="w-full py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white
+                     font-medium rounded-lg transition-colors duration-200 focus:outline-none">
+            بروز رسانی اطلاعات
+        </button>
+    </div>
+</EditForm>
+
+@* <EditForm Model="@Model" OnValidSubmit="UpdateAccount" FormName="UpdateForm">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label>@localizer[nameof(ResourceStrings.AccountUsername)]</label>
+        <InputText @bind-Value="Model.Username" class="form-control" />
+        <ValidationMessage For="() => Model.Username" />
+    </div>
+    <div class="mb-3">
+        <label>@localizer[nameof(ResourceStrings.AccountPassword)]</label>
+        <InputText @bind-Value="Model.Password" class="form-control" />
+        <ValidationMessage For="() => Model.Password" />
+    </div>
+    <div class="mb-3">
+        <label>@localizer[nameof(ResourceStrings.Email)]</label>
+        <InputText @bind-Value="Model.Email" class="form-control" />
+        <ValidationMessage For="() => Model.Email" />
+    </div>
+    <div class="mb-3">
+        <label>@localizer[nameof(ResourceStrings.AccountPicture)]</label>
+        <InputText @bind-Value="Model.PictureUrl" class="form-control" />
+        <ValidationMessage For="() => Model.PictureUrl" />
+    </div>
+    <div class="mb-3">
+        <span class="text-danger">@errorMessage</span>
+    </div>
+    <div class="mb-3">
+        <span class="text-success">@successMessage</span>
+    </div>
+
+    <div>
+        <button type="submit" class="btn btn-primary">
+            @localizer[nameof(ResourceStrings.UpdateAccount)]
+        </button>
+    </div>
+</EditForm>
+ *@
+@code {
+
+    #region Private Fields
+
+    [SupplyParameterFromForm]
+    private UpdateInfoViewModel Model { get; set; } = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? _authenticationState { get; set; }
+
+    private string? errorMessage { get; set; }
+    private string? successMessage { get; set; }
+    private string? _originalUsername { get; set; }
+    private string? _originalEmail { get; set; }
+
+    #endregion
+
+    #region Public Fields
+
+    // [CascadingParameter]
+    // public HttpContext? HttpContext { get; set; }
+
+    #endregion
+
+    #region Private Methods
+
+    private async Task UpdateAccount()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        ApiResponse<UserEntity> user;
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"api/User/update", Model);
+            user = await response.Content.ReadFromJsonAsync<ApiResponse<UserEntity>>();
+
+
+            if (!user.Success || user == null)
+            {
+
+                switch (user.ErrorCode)
+                {
+                    case nameof(ResourceStringsError.UserNotFound):
+                        {
+                            toastService.ShowError("کاربری یافت نشد.");
+                            // errorMessage = localizer[nameof(ResourceStringsError.UserNotFound)];
+                            break;
+                        }
+                    case nameof(ResourceStringsError.NoChangesToUserAccount):
+                        {
+                            toastService.ShowError("هیچ تغییری در اطلاعات بوجود نیامده است.");
+
+                            // errorMessage = localizer[nameof(ResourceStringsError.NoChangesToUserAccount)];
+                            break;
+                        }
+                    case nameof(ResourceStringsError.UsernameAlreadyExist):
+                        {
+                            toastService.ShowError("نام کاربری در دسترس نیست.نام کاربری را تغییر دهید.");
+
+                            // errorMessage = localizer[nameof(ResourceStringsError.UsernameAlreadyExist)];
+                            break;
+                        }
+                    case nameof(ResourceStringsError.EmailAlreadyExist):
+                        {
+                            toastService.ShowError("ایمیل در دسترس نیست.");
+
+                            // errorMessage = localizer[nameof(ResourceStringsError.EmailAlreadyExist)];
+                            break;
+                        }
+                }
+                Model.Password = string.Empty;
+                return;
+            }
+            toastService.ShowSuccess("اطلاعات کاربری با موفقیت بروز رسانی شد.");
+            // successMessage = localizer[nameof(ResourceStringsSuccessMessage.AccountUpdated)];
+            Model.Password = string.Empty;
+
+            Navigation.NavigateTo(Navigation.Uri);
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("خطای در سرور رخ داده است.");
+            Model.Password = string.Empty;
+            // errorMessage = localizer[nameof(ResourceStringsError.ServerError)];
+        }
+
+    }
+
+    #endregion
+
+    #region Life Cycle Methods
+
+    private int _userId { get; set; }
+    private string? _jwtToken { get; set; }
+    private bool _isAuthenticated { get; set; }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            _jwtToken = await JS.InvokeAsync<string>("localStorage.getItem", "jwt_token");
+
+            if (string.IsNullOrEmpty(_jwtToken))
+            {
+                // Handle missing token (maybe redirect to login page)
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            // Add JWT token to the authorization header
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var authenticatedUser = await _authenticationState!;
+
+            var userId = authenticatedUser.ExtractUserIdFromToken();
+            string jwt = authenticatedUser.ExtractJWTFromToken();
+
+            var url = $"api/User/{userId}";
+            try
+            {
+
+
+                var response = await _httpClient.GetFromJsonAsync<ApiResponse<UserEntity>>(url);
+                if (response.Success)
+                {
+                    Model.Username = response.Data.Username;
+                    Model.Password = string.Empty;
+                    Model.Email = response.Data.Email;
+                    Model.PictureUrl = response.Data.PictureUrl;
+                    Model.Id = response.Data.Id;
+                    _originalUsername = response.Data.Username;
+                    _originalEmail = response.Data.Email;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("401"))
+                {
+                    errorMessage = "دسترسی مجاز نیست.";
+                }
+                else
+                {
+                    errorMessage = "خطای در سرور رخ داده است.";
+                    Console.WriteLine(ex.Message);
+                }
+            }
+
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+    }
+
+    #endregion
+
+}

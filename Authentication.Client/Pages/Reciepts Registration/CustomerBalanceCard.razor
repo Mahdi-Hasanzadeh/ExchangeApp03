@@ -1,0 +1,396 @@
+﻿@rendermode InteractiveWebAssembly
+@inject ILogger<CustomerBalanceCard> Logger
+@* موجودی فرد *@
+
+<div class="container mx-auto mt-2 p-2 shadow-sm rounded-2xl bg-gradient-to-r dark:bg-slate-800"
+style="background: url('images/background.png') center/cover no-repeat;">
+
+    <div class="flex justify-center">
+        <div class="w-full lg:w-1/3">
+            <div class="dark:bg-gray-700
+                        text-white rounded-xl p-4 shadow-lg flex items-center justify-between
+                        cursor-pointer transition-colors duration-300"
+            @onclick="ToggleCardSection">
+                <h5 class="text-lg font-bold ">اطلاعات حساب مشتری</h5>
+                <div class="flex items-center gap-2">
+                    <span>@(isExpanded ? "نمایش" : "بستن")</span>
+                    <i class="bi @(isExpanded ? "bi-chevron-down" : "bi-chevron-up") text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Section -->
+    <div class="flex flex-wrap gap-4 mt-2 justify-center items-center transition-all duration-500 ease-in-out overflow-hidden"
+    style="max-height: @(isCardSectionVisible ? "1000px" : "0");">
+
+        @if (CustomerId == 0)
+        {
+            <h4 class="text-xl text-white font-semibold">یک حساب مشتری را انتخاب کنید.</h4>
+        }
+        else if (_customerBalances.Count == 0)
+        {
+            <h4 class="text-xl text-white font-semibold">مشتری حسابی ندارد.</h4>
+        }
+        else
+        {
+            <div class="flex gap-2 w-full py-3">
+                <!-- Dynamic Cards Section (Fills Remaining Space) -->
+                <div class="flex-grow overflow-x-auto custom-scrollbar">
+                    <div class="flex gap-3 py-3">
+                        @foreach (var ((currencyId, card), index) in _customerBalances.ToList().Select((kvp, i) => (kvp, i)))
+                        {
+                            <div class="cursor-pointer relative z-0 min-w-[15rem] max-w-[15rem] h-24 rounded-xl shadow-lg flex items-center
+                                     transform transition-opacity duration-500 ease-in-out hover:scale-105 hover:duration-500"
+                            style="opacity:@(isCardSectionVisible ? "1" : "0"); transition-delay:@((index * 0.2) + "s");
+                                      background: linear-gradient(to right, black, #524d4d);
+                                      background: rgba(255, 255, 255, 0.1);
+                                      backdrop-filter: blur(10px);
+                                      -webkit-backdrop-filter: blur(10px); ">
+
+                                <!-- Right Side: Content -->
+                                <div class="w-3/4 text-white text-center p-2">
+                                    <h5 class="text-2xl font-bold mb-1">@card.CurrencyName</h5>
+                                    <h4 class="text-2xl font-extrabold">
+                                        @if (card.Balance < 0)
+                                        {
+                                            @Math.Abs(card.Balance).ToTwoDecimalPoints()
+                                            <div class="inline font-bold text-4xl text-red-500">-</div>
+                                        }
+                                        else
+                                        {
+                                            @card.Balance.ToTwoDecimalPoints()
+                                        }
+                                    </h4>
+                                </div>
+
+                                <!-- Left Side: Full-Cover Image -->
+                                <div class="w-2/5 h-full flex items-center justify-center">
+                                    <img src="@(card.Image != null && card.Image.Length > 0 ? card.Image.ConvertByteArrayToImage() : "default-image.png")"
+                                    alt="@card.CurrencyName" class="w-16 h-16 object-cover rounded-full border-2 border-white">
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+
+                <div class="flex-shrink-0 py-3 pr-2">
+                    <div class="min-w-[15rem] max-w-[15rem] h-24 rounded-xl shadow-lg flex justify-center items-center
+         transform transition-opacity duration-500 ease-in-out hover:scale-105 hover:duration-500"
+                    style="opacity:@(isCardSectionVisible ? "1" : "0"); transition-delay:@((_customerBalances.Count * 0.2) + "s");
+           background: rgba( 225, 32, 32, 0.1 );
+box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+backdrop-filter: blur( 0px );
+-webkit-backdrop-filter: blur( 0px );
+border-radius: 10px;
+border: 1px solid rgba( 255, 255, 255, 0.18 );
+                    ">
+
+                        <!-- Right Side: Content -->
+                        <div class="w-3/4 text-white text-center p-2">
+                            <h5 class="text-2xl font-bold mb-1">@_customerTotalBalance.CurrencyName</h5>
+                            <h4 class="text-2xl font-extrabold">
+                                @if (_customerTotalBalance.Balance < 0)
+                                {
+                                    @Math.Abs(_customerTotalBalance.Balance).ToTwoDecimalPoints()
+                                    <div class="inline font-bold text-4xl text-red-500">-</div>
+                                }
+                                else
+                                {
+                                    @_customerTotalBalance.Balance.ToTwoDecimalPoints()
+                                }
+                            </h4>
+                        </div>
+
+                        <!-- Left Side: Full-Cover Image -->
+                        <div class="w-2/5 h-full flex items-center justify-center">
+                            <img src="images/usa.gif"
+                            alt="@_customerTotalBalance.CurrencyName" class="w-16 h-16 object-cover rounded-full border-2 border-white">
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Fixed Dollar Card Section (Only Takes Necessary Space) -->
+                @*  <div class="flex-shrink-0 py-3 pr-2">
+                    <div class="min-w-[15rem] max-w-[15rem] h-24 rounded-xl shadow-lg flex justify-center items-center
+                         transform transition-opacity duration-500 ease-in-out hover:scale-105 hover:duration-500"
+                         style="opacity:@(isCardSectionVisible ? "1" : "0"); transition-delay:@((_customerBalances.Count * 0.2) + "s");
+                         background: linear-gradient(to right, black, #524d4d);">
+
+                        <!-- Right Side: Content -->
+                        <div class="w-3/5 text-white text-center p-2">
+                            <h5 class="text-2xl font-bold mb-1">@_customerTotalBalance.CurrencyName</h5>
+                            <h4 class="text-2xl font-extrabold">
+                                @if (_customerTotalBalance.Balance < 0)
+                                {
+                                    @Math.Abs(_customerTotalBalance.Balance).ToThreeDigitFormatPersian()
+                                    <div class="inline font-bold text-4xl text-red-500">-</div>
+                                }
+                                else
+                                {
+                                    @_customerTotalBalance.Balance.ToThreeDigitFormatPersian()
+                                }
+                            </h4>
+                        </div>
+
+                        <!-- Left Side: Full-Cover Image -->
+                        <div class="w-2/5 h-full rounded-xl overflow-hidden">
+                            <img src="images/usa.gif"
+                                 alt="@_customerTotalBalance.CurrencyName" class="object-cover">
+                        </div>
+                    </div>
+                </div> *@
+            </div>
+
+
+        }
+    </div>
+</div>
+
+@code {
+
+    #region Life Cycles
+
+    private bool isExchangeRateLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Logger.LogInformation($"onInitialized is invoked {c} times");
+
+        // var name = CurrenciesList;
+        // if (!isExchangeRateLoaded)
+        // {
+        //     await FetchCurrencyExchangeRate();
+        //     isExchangeRateLoaded = true;
+        // }
+
+        // if (CurrenciesList != null && CurrenciesList.Count > 0)
+        // {
+        // }
+    }
+
+    private int c = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+
+    }
+
+    private int _previousCustomerId = 0;
+    private int count = 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+
+        count = count + 1;
+        Logger.LogInformation($"onParameterAsync is invoked {count} times");
+        if (CustomerId != null && CustomerId > 0 && CustomerId != _previousCustomerId)
+        {
+            _previousCustomerId = CustomerId;
+            await FetchCustomerBalance();
+        }
+    }
+
+    #endregion
+    #region private fields
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private Dictionary<int, CustomerBalanceDetailsDTO> _customerBalances { get; set; } = new();
+    private CustomerBalanceDetailsDTO _customerTotalBalance { get; set; } = new();
+
+    private bool isCardSectionVisible = true; // Track the visibility state
+
+    private bool isExpanded = false; // To track if the chevron is pointing up or down
+
+    #endregion
+
+    #region public fields
+
+    [Parameter]
+    public Dictionary<int, CurrencyDetailDTO> _currencyExchangeRate { get; set; } = new();
+
+    [Parameter]
+    public int CustomerId { get; set; } = 0;
+
+    [Parameter]
+    public Dictionary<int, CurrencyDTO> CurrenciesList { get; set; } = new();
+
+    #endregion
+
+    #region private methods
+
+    private void ToggleCardSection()
+    {
+        isCardSectionVisible = !isCardSectionVisible;
+        isExpanded = !isExpanded; // Change the chevron icon direction
+    }
+
+    public async Task FetchCustomerBalance()
+    {
+        try
+        {
+            var authenticatedUser = await _state;
+            var _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+                return;
+            }
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            string url = $"api/CustomerAccount/customerBalance/{CustomerId}";
+
+            var response = await _httpClient
+            .GetFromJsonAsync<ApiResponse<IEnumerable<CustomerBalanceDetailsDTO>>>(url);
+
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerBalance)]);
+                return;
+            }
+
+            // Cards = new List<CardModel>();
+
+            _customerBalances = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            CalculateTotalBalance();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    public void CalculateTotalBalance()
+    {
+        decimal totalBalance = 0;
+
+        foreach (var balance in _customerBalances.Values)
+        {
+            // balance == dollar     exchange => key:target,
+            if (balance.CurrencyId == _currencyExchangeRate[balance.CurrencyId].TargetCurrencyId
+            && balance.CurrencyId == _currencyExchangeRate[balance.CurrencyId].BaseCurrencyId
+            )
+            {
+                totalBalance += balance.Balance;
+            }
+            else
+            {
+                totalBalance += balance.Balance / (decimal)_currencyExchangeRate[balance.CurrencyId].BuyValue;
+            }
+        }
+        _customerTotalBalance.Balance = totalBalance;
+        _customerTotalBalance.CurrencyName = "خلاصه حساب به دالر";
+    }
+
+    public async Task UpdateCustomerBalanceLocallyAfterRemoveTransaction(int currencyId, decimal amount, DealType dealType)
+    {
+        var absoluteAmount = Math.Abs(amount);
+        if (dealType == DealType.Deposit)
+        {
+            _customerBalances[currencyId].Balance -= absoluteAmount;
+            // calculate total balance
+        }
+        else
+        {
+            _customerBalances[currencyId].Balance += absoluteAmount;
+            // calculate total balance
+        }
+        CalculateTotalBalance();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Update Customer Balance locally, if deposit, add to account,if withdraw minus from account
+    /// </summary>
+    /// <param name="currencyId"></param>
+    /// <param name="amount"></param>
+    /// <param name="dealType"></param>
+    /// <returns></returns>
+    public async Task UpdateCustomerBalanceLocally(int currencyId, decimal amount, DealType dealType)
+    {
+        if (dealType == DealType.Deposit)
+        {
+            _customerBalances[currencyId].Balance += (amount);
+            // calculate total balance
+        }
+        else
+        {
+            _customerBalances[currencyId].Balance -= (amount);
+            // calculate total balance
+        }
+
+        CalculateTotalBalance();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Rollback balance based on the old dealType.
+    /// </summary>
+    /// <param name="currencyId"></param>
+    /// <param name="amount"></param>
+    /// <param name="dealType">if old type is deposit, it withdraw, and if old type is withdraw, it deposit</param>
+    /// <returns></returns>
+    public async Task DecreaseBalance(int currencyId, decimal amount, DealType dealType)
+    {
+        amount = Math.Abs(amount);
+        if (dealType == DealType.Deposit)
+        {
+            _customerBalances[currencyId].Balance -= amount;
+            // calculate total balance
+        }
+        else
+        {
+            _customerBalances[currencyId].Balance += (amount);
+            // calculate total balance
+        }
+    }
+    /// <summary>
+    /// Update balance for a new transaction,
+    /// </summary>
+    /// <param name="currencyId"></param>
+    /// <param name="amount"></param>
+    /// <param name="dealType"></param>
+    /// <returns></returns>
+    public async Task IncreaseBalance(int currencyId, decimal amount, DealType dealType)
+    {
+        if (_customerBalances.ContainsKey(currencyId))
+        {
+
+            amount = Math.Abs(amount);
+            if (dealType == DealType.Deposit)
+            {
+                _customerBalances[currencyId].Balance += amount;
+                // calculate total balance
+            }
+            else
+            {
+                _customerBalances[currencyId].Balance -= (amount);
+                // calculate total balance
+            }
+            CalculateTotalBalance();
+            StateHasChanged();
+        }
+        else
+        {
+            await FetchCustomerBalance();
+        }
+
+    }
+
+    
+    #endregion
+
+
+}
+

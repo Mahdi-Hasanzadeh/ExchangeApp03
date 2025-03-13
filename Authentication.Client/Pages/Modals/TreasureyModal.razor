@@ -1,0 +1,301 @@
+﻿@using Shared.View_Model.CustomerAccount
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+
+<div class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out"
+     @onclick="HandleBackgroundClick"
+     style="opacity: @(isModalOpen ? "1" : "0"); pointer-events:@(isModalOpen ? "auto" : "none");">
+
+    <div class="relative bg-white shadow-2xl p-10 mb-4 rounded-2xl p-8 w-full max-w-4xl max-h-[75dvh] md:max-h-[91dvh] overflow-y-auto
+            transform transition-all duration-500 ease-out"
+         style="transform: @(isModalOpen ? "scale(1)" : "scale(0)");"
+         @onclick:stopPropagation="true">
+        <!-- Close Button -->
+        <div class="text-left">
+            <button @onclick="CloseModal" class="relative -top-5 -left-5 text-gray-600 dark:text-black hover:text-red-500 transition">✕</button>
+        </div>
+
+        <!-- Toggle Button -->
+        <h5 class="text-2xl">
+            صندوق
+        </h5>
+        <hr class="relative my-4 z-0 opacity-75 border-slate-500">
+
+        @if (_loadingBalances)
+        {
+            <LoadingTitle Content="در حال بارگیری حسابات صندوق..." />
+        }
+        else if (_currenciesList.Count == 0)
+        {
+            <LoadingTitle Content="هیچ ارزی در سیستم وجود ندارد." />
+        }
+        else if (_customerBalances.Count == 0)
+        {
+            <LoadingTitle Content="حساب صندوق در سیستم تعریف نشده است." />
+        }
+        else
+        {
+            <div class="dash-card group rounded-xl p-6 mb-4">
+                <div class="flex items-center justify-center gap-4">
+                    <!-- Icon -->
+                    <div class="icon-container-currency text-white flex items-center justify-center">
+                        <img src="images/usa.gif" class="w-12 h-12 object-cover rounded-full border-2 border-white" />
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex-1 text-right">
+                        <p class="text-lg mb-1">@_customerTotalBalance.CurrencyName</p>
+                        @if (_customerTotalBalance.Balance < 0)
+                        {
+                            <h3 class="text-gradient text-3xl font-bold">
+                                @Math.Abs(_customerTotalBalance.Balance).ToFormattedDecimal()<span class="text-3xl">-</span>
+                            </h3>
+                        }
+                        else
+                        {
+                            <h3 class="text-gradient text-3xl font-bold">@_customerTotalBalance.Balance.ToFormattedDecimal()</h3>
+                        }
+                    </div>
+                </div>
+            </div>
+            <hr />
+            <!-- Account List -->
+            <div class="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4">
+
+                @foreach (var item in _customerBalances.Values)
+                {
+                    <!-- Customer Card -->
+                    <div class="dash-card relative group rounded-xl p-6">
+                        <div class="flex items-center gap-4">
+                            <!-- Icon -->
+                            <div class="icon-container-currency text-white  flex items-center justify-center">
+                                <img src="@(item.Image != null ? item.Image.ConvertByteArrayToImage() : "images/defaultMoney.jpeg" )" class="w-12 h-12 object-cover rounded-full border-2 border-white" />
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex-1 text-right">
+                                <p class="text-lg mb-1">@item.CurrencyName</p>
+                                @if (item.Balance < 0)
+                                {
+                                    <h3 class="text-gradient text-3xl font-bold">
+                                        @Math.Abs(item.Balance).ToFormattedDecimal()<span class="text-3xl">-</span>
+                                    </h3>
+                                }
+                                else
+                                {
+                                    <h3 class="text-gradient text-3xl font-bold">@item.Balance.ToFormattedDecimal()</h3>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool isModalOpen { get; set; } = false;
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync(); // Calls toggleModal() in the parent
+    }
+
+    private bool _loadingBalances { get; set; } = false;
+
+    private string _errorMessage = "";
+    private int _userId { get; set; }
+    private string _jwtToken { get; set; }
+    private bool _isAuthenticated { get; set; }
+
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _authenticationState { get; set; }
+
+    private void HandleBackgroundClick(MouseEventArgs e)
+    {
+        CloseModal();
+    }
+
+    public void CalculateTotalBalance()
+    {
+        decimal totalBalance = 0;
+
+        foreach (var balance in _customerBalances.Values)
+        {
+            // balance == dollar     exchange => key:target,
+            if (balance.CurrencyId == _currencyExchangeRate[balance.CurrencyId].TargetCurrencyId
+            && balance.CurrencyId == _currencyExchangeRate[balance.CurrencyId].BaseCurrencyId
+            )
+            {
+                totalBalance += balance.Balance;
+            }
+            else
+            {
+                var rate = _currencyExchangeRate[balance.CurrencyId];
+                var buyValue = (decimal)rate.BuyValue;
+                if (buyValue == 0)
+                {
+                    toastService.ShowInfo(string.Format("لطفا مقدار خرید را برای ارز {0} مشخص کنید.", rate.Name));
+                }
+                else
+                {
+                    totalBalance += balance.Balance / buyValue;
+                }
+
+            }
+        }
+        _customerTotalBalance.Balance = totalBalance;
+        _customerTotalBalance.CurrencyName = "خلاصه حساب به دالر";
+    }
+
+    private Dictionary<int, CustomerBalanceDetailsDTO> _customerBalances { get; set; } = new();
+
+    private CustomerBalanceDetailsDTO _customerTotalBalance { get; set; } = new();
+
+    private Dictionary<int, CurrencyDTO> _currenciesList { get; set; } = new();
+
+    public Dictionary<int, CurrencyDetailDTO> _currencyExchangeRate { get; set; } = new();
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _loadingBalances = true;
+            // var authenticatedUser = await _authenticationState;
+            // var _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            // if (!_isAuthenticated)
+            // {
+            //     toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            //     return;
+            // }
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            // var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+
+            if (_currenciesList.Count > 0)
+            {
+                await FetchCurrencyExchangeRate();
+            }
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingBalances = false;
+        }
+    }
+
+    public async Task FetchTreasuryBalance()
+    {
+        try
+        {
+            // var authenticatedUser = await _authenticationState;
+            // var _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            // if (!_isAuthenticated)
+            // {
+            //     toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            //     return;
+            // }
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            // var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            string url = $"api/CustomerAccount/treasuryBalance/{_userId}";
+
+            var response = await _httpClient
+            .GetFromJsonAsync<ApiResponse<IEnumerable<CustomerBalanceDetailsDTO>>>(url);
+
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerBalance)]);
+                return;
+            }
+
+            _customerBalances = response.Data.ToDictionary(item => item.CurrencyId, item => item);
+            CalculateTotalBalance();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    private async Task FetchCurrencyExchangeRate()
+    {
+        try
+        {
+            // var authenticatedUser = await _authenticationState;
+            // var userId = authenticatedUser.ExtractUserIdFromToken();
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            int baseCurrencyId = _currenciesList.Where(c => c.Value.Code == "USD").FirstOrDefault().Key;
+
+            string url = $"api/Currency/currencyDetail/{baseCurrencyId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDetailDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            foreach (var item in response.Data)
+            {
+                item.ImageString = item.Image != null && item.Image.Length > 0 ?
+                item.Image.ConvertByteArrayToImage() : string.Empty;
+            }
+            _currencyExchangeRate = response.Data.ToDictionary(item => item.TargetCurrencyId, item => item);
+            await FetchTreasuryBalance();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _authenticationState;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+        if (!_isAuthenticated)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            return;
+        }
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+        await FetchCurrencies();
+    }
+
+}
+

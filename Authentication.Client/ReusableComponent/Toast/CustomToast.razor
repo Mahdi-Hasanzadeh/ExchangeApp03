@@ -1,0 +1,24 @@
+﻿@using Blazored.Toast
+@using Blazored.Toast.Configuration
+
+<BlazoredToasts RemoveToastsOnNavigation="@false"
+                Timeout="@Timeout" ShowProgressBar="@ShowProgressBar" ShowCloseButton="true"
+                Position="@Position" MaxToastCount="@MaxToastCount" />
+
+@code {
+    [Parameter]
+    public bool RemoveToastsOnNavigation { get; set; } = false;
+
+    [Parameter]
+    public int Timeout { get; set; } = 10;
+
+    [Parameter]
+    public int MaxToastCount { get; set; } = 3;
+
+    [Parameter]
+    public bool ShowProgressBar { get; set; } = true;
+
+    [Parameter]
+    public ToastPosition Position { get; set; } = ToastPosition.TopRight;
+
+}

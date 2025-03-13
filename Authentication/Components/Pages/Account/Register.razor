@@ -1,0 +1,154 @@
+﻿@page "/register"
+@using Authentication.Client.Pages.Forms
+@using Authentication.ServerAuthentication
+@inject HttpClient HTTP
+@rendermode InteractiveServer
+
+<CustomToast />
+@if (!isUserAuthenticated)
+{
+    <div class="flex items-center justify-center items-center p-4">
+        <div class="w-full max-w-md bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl shadow-lg p-8">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+                ثبت نام
+            </h3>
+
+            <EditForm Model="@Model" OnValidSubmit="RegisterAccount" FormName="RegisterForm">
+                <DataAnnotationsValidator />
+                <div class="space-y-4">
+                    <!-- Username -->
+                    <div>
+                        <Label Content="نام کاربری" />
+                        <InputText @bind-Value="Model.Username"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg
+                                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                                          placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+                        <ValidationMessage For="() => Model.Username"
+                                           class="mt-1 text-sm text-red-600" />
+                    </div>
+
+                    <!-- Password -->
+                    <div>
+                        <Label Content="رمز" />
+                        <InputText @bind-Value="Model.Password"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg
+                                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                                          placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+                        <ValidationMessage For="() => Model.Password"
+                                           class="mt-1 text-sm text-red-600" />
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div>
+                        <Label Content="تایید رمز" />
+                        <InputText @bind-Value="Model.ConfirmPassword"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg
+                                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                                          placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+                        <ValidationMessage For="() => Model.ConfirmPassword"
+                                           class="mt-1 text-sm text-red-600" />
+                    </div>
+                    <div>
+                        <Label Content="نام سرور" />
+                        <InputText @bind-Value="Model.ServerName"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg
+                                          focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                                          placeholder-gray-400 transition-all duration-200 focus:outline-none" />
+                        <ValidationMessage For="() => Model.ServerName"
+                                           class="mt-1 text-sm text-red-600" />
+                    </div>
+
+                    <!-- Error Message -->
+                    <div class="p-3 bg-red-50 rounded-lg border border-red-200"
+                         style="@(string.IsNullOrEmpty(errorMessage) ? "display:none;" : "")">
+                        <span class="text-red-600 text-sm">@errorMessage</span>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit"
+                            class="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white
+                                 font-medium rounded-lg transition-colors duration-200">
+                        ساختن حساب کاربری
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+else
+{
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-green-50 rounded-xl p-6 text-center border border-green-200">
+            <i class="bi bi-check-circle-fill text-green-600 text-4xl mb-4"></i>
+            <h4 class="text-xl font-semibold text-green-600">
+                شما ثبت نام کرده اید.
+            </h4>
+        </div>
+    </div>
+}
+
+@code {
+
+    #region Public Fields
+
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    #endregion
+
+    #region Private Fields
+
+    [SupplyParameterFromForm]
+    private RegisterViewModel Model { get; set; } = new();
+
+    private string? errorMessage;
+    [CascadingParameter]
+    private Task<AuthenticationState>? authenticationState { get; set; }
+
+    private bool isUserAuthenticated { get; set; }
+    private bool isUserAdministrator { get; set; }
+
+
+    #endregion
+
+    #region Life Cycle Methods
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await authenticationState;
+        isUserAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+        isUserAdministrator = authenticatedUser.User.IsInRole(nameof(Roles.Administrator));
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private async Task RegisterAccount()
+    {
+        try
+        {
+            // var response = await HTTP.PostAsJsonAsync($"{Utils.ServerUrl}api/User/register", Model);
+            var response = await HTTP.PostAsJsonAsync($"api/User/register", Model);
+            var r = response.IsSuccessStatusCode;
+            var user = await response.Content.ReadFromJsonAsync<ApiResponse<UserEntity>>();
+            if (!user.Success || user == null)
+            {
+                // errorMessage = localizer[nameof(ResourceStrings.UserAlreadyExistError)];
+                toastService.ShowError(localizer[nameof(ResourceStringsError.UsernameAlreadyExist)]);
+                // errorMessage = user.Message;
+                return;
+            }
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(localizer[nameof(ResourceStringsError.ServerError)]);
+            // errorMessage = localizer[nameof(ResourceStringsError.ServerError)] + ex.Message;
+        }
+
+    }
+
+    #endregion
+
+}

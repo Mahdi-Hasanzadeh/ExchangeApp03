@@ -1,0 +1,94 @@
+﻿@if (_loading == false && _cutomersInfoList != null && _cutomersInfoList.Count() != 0)
+{
+    <InputSelect @bind-Value="selectedValue"
+                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="0">@Content</option>
+        @foreach (var customer in _cutomersInfoList)
+        {
+            <option @key="customer.CustomerId" value="@customer.CustomerId">@customer.CustomerName-@customer.AccountNumber</option>
+        }
+    </InputSelect>
+}
+
+@code {
+    [Parameter]
+    public string Content { get; set; } = "شماره حساب را انتخاب کنید.";
+
+    [Parameter]
+    public int BindValueTo { get; set; } // This holds the parent value
+
+    [Parameter]
+    public EventCallback<int> BindValueToChanged { get; set; } // Required for two-way binding
+
+    private List<CustomerAccountSummaryDTO> _cutomersInfoList { get; set; } = new();
+
+    private bool _loading { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private async Task FetchCustomers()
+    {
+        try
+        {
+            _loading = true;
+            var authenticatedUser = await _state;
+            var _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!_isAuthenticated)
+            {
+                _loading = false; // Set this early
+                StateHasChanged(); // Force UI update
+                return;
+            }
+
+            var _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            var _jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+
+            // Fetch All customers with name and Id
+
+            string url = $"api/CustomerAccount/CustomersSummary/{_userId}";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CustomerAccountSummaryDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCustomerAccounts)]);
+                return;
+            }
+            _cutomersInfoList = response.Data.ToList();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedValue = BindValueTo;
+        await FetchCustomers();
+    }
+    private int selectedValue
+    {
+        get => BindValueTo;
+        set
+        {
+            if (BindValueTo != value)
+            {
+                BindValueTo = value;
+                BindValueToChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private async Task OnValueChanged(ChangeEventArgs e)
+    {
+        selectedValue = int.Parse(e.Value.ToString());
+        await BindValueToChanged.InvokeAsync(selectedValue); // Notify parent about the change
+    }
+}

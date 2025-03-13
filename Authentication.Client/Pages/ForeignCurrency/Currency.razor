@@ -1,0 +1,517 @@
+﻿@page "/currency/addOrEdit"
+@rendermode InteractiveWebAssembly
+@attribute [StreamRendering]
+@using Shared.DTOs.CurrencyDTOs
+
+<PageTitle>افروردن / ویرایش ارزها</PageTitle>
+@if (!OperatingSystem.IsBrowser())
+{
+    <LoadingWithImage />
+}
+else
+{
+    <AuthorizeView Roles="Administrator">
+        <Authorizing>
+            <LoadingWithImage Content="در حال تایید هویت شما..." />
+        </Authorizing>
+        <NotAuthorized>
+            <NoPermission />
+        </NotAuthorized>
+        <Authorized Context="authContext">
+            <CustomToast />
+            @if (_loadingCurrencies)
+            {
+                <LoadingProgress />
+            }
+            else
+            {
+                <div class="container mx-auto p-4">
+                    <!-- Responsive Layout -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 align-center gap-4">
+
+
+                        <!-- Section 1: Add/Update Currency -->
+                        <div class="shadow-lg bg-white rounded-lg p-4">
+
+                            <h1 class="text-2xl font-bold text-center mb-4">@(_updateMode ? "ویرایش ارز" : "افزودن ارز")</h1>
+
+                            <EditForm Model="@_currencyDTO" OnValidSubmit="AddCurrency" class="space-y-4">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary class="text-red-500" />
+
+                                <!-- Currency Name -->
+                                <div>
+                                    <label class="block text-gray-700">نام <span class="text-red-500">*</span></label>
+                                    <InputText @bind-Value="_currencyDTO.Name"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none text-sm md:text-base" />
+                                    <ValidationMessage For="() => _currencyDTO.Name" class="text-red-500 text-sm" />
+                                </div>
+
+                                <!-- Currency Code -->
+                                <div>
+                                    <label class="block text-gray-700">کد</label>
+                                    <InputText @bind-Value="_currencyDTO.Code"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none text-sm md:text-base" />
+                                    <ValidationMessage For="() => _currencyDTO.Code" class="text-red-500 text-sm" />
+                                </div>
+
+                                <!-- Currency Symbol -->
+                                <div>
+                                    <label class="block text-gray-700 mb-2">سمبول</label>
+                                    <InputText @bind-Value="_currencyDTO.Symbol"
+                                               class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none text-sm md:text-base" />
+                                    <ValidationMessage For="() => _currencyDTO.Symbol" class="text-red-500 text-sm" />
+                                </div>
+
+                                <!-- Unit -->
+                                <div>
+                                    <label class="block text-gray-700 mb-2">واحد</label>
+                                    <InputNumber @bind-Value="_currencyDTO.Unit"
+                                                 class="w-full border rounded-md p-2 focus:ring-2 focus:ring-blue-400 outline-none text-sm md:text-base" />
+                                    <ValidationMessage For="() => _currencyDTO.Unit" class="text-red-500 text-sm" />
+                                </div>
+
+                                <!-- Image Upload Section -->
+                                <div>
+                                    <label class="block text-gray-700 font-semibold mb-2">آپلود تصویر</label>
+                                    <UploadButton SelectedFileName="@_selectedFileName" OnChange="@HandleImageChange" />
+                                    <ValidationMessage For="() => _currencyDTO.Image" class="text-red-500 text-sm" />
+                                    <!-- Image Preview -->
+                                    @if (!string.IsNullOrEmpty(_previewImage))
+                                    {
+                                        <img src="@_previewImage" alt="پیش‌نمایش" class="mt-2 rounded-md shadow-md w-32 h-32 object-cover" />
+                                    }
+                                </div>
+
+                                <!-- Error Message -->
+                                <div class="text-red-500 text-sm mb-2">
+                                    <span>@_errorMessage</span>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex justify-start gap-4">
+                                    <MdSuccessButton IsDisabled="@_isDisabled" ButtonType="submit"
+                                                     Content="@(_updateMode ? "بروز رسانی" : "ثبت")" />
+                                    <MdDangerButton IsDisabled="@_isDisabled" ButtonType="button"
+                                                    Content="انصراف" OnClick="ResetFormData" />
+                                </div>
+                            </EditForm>
+                        </div>
+
+                        <!-- Section 2: Currency Table -->
+                        @if (_loadingCurrencies)
+                        {
+                            <LoadingTitle Content="در حال بارگیری ارزها..." />
+                        }
+                        else if (_currenciesList.Count == 0)
+                        {
+                            <LoadingTitle Content="هیچ ارزی در سیستم ثبت نشده است." />
+                        }
+                        else
+                        {
+                            <div class="shadow-sm bg-white rounded-xl p-5 overflow-x-auto border border-gray-200">
+                                <h1 class="text-2xl font-semibold text-center mb-5 text-gray-800">لیست ارزها</h1>
+                                <table class="min-w-full">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">نام ارز</th>
+                                            <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">کد ارز</th>
+                                            <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">نماد</th>
+                                            <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">وضعیت</th>
+                                            <th class="px-5 py-3 text-center font-medium text-gray-600 text-lg border-b-2 border-gray-100">عملیات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white">
+                                        @foreach (var currency in _currenciesList)
+                                        {
+                                            <tr class="group relative transition-all duration-150 ease-in-out hover:-translate-y-1
+                                            hover:shadow-lg border-b border-gray-200 group-hover:opacity-100 rounded-lg
+                                            hover:cursor-pointer even:bg-gray-100">
+                                                <td class="px-5 py-4 text-center text-gray-700 font-medium">
+                                                    <div class="flex items-center justify-center gap-2">
+                                                        @currency.Name
+                                                    </div>
+                                                </td>
+                                                <td class="px-5 py-4 text-center text-gray-600">@currency.Code</td>
+                                                <td class="px-5 py-4 text-center text-gray-600 font-medium">@currency.Symbol</td>
+                                                <td class="px-5 py-4 text-center text-gray-600 font-medium">@(currency.IsActive ? "فعال" : "غیر فعال")</td>
+                                                <td class="px-5 py-4 flex items-center justify-center gap-2">
+
+                                                    <EditIconButton Parameter="@currency.CurrencyId"
+                                                                    Content="ویرایش"
+                                                                    OnClick="updateCurrency"
+                                                                    ButtonWidth="6rem" />
+
+                                                    @* <DeleteIconButton Parameter="@currency.CurrencyId"
+                                                                      Content="@(currency.IsActive ? "غیر فعال" : "فعال")"
+                                                                      OnClick="HandleCurrencyActivation"
+                                                                      ButtonWidth="6rem" /> *@
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+}
+
+
+@code {
+
+    #region Private Fields
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private bool _updateMode { get; set; } = false;
+
+    private bool _initialLoading { get; set; } = false;
+    private bool _loadingCurrencies { get; set; } = false;
+    private string _errorMessage { get; set; } = string.Empty;
+    private bool _isDisabled { get; set; } = false;
+    private CurrencyDTO _currencyDTO { get; set; } = new();
+
+    private List<CurrencyDTO> _currenciesList { get; set; } = new List<CurrencyDTO>();
+
+    private string _selectedFileName = "هیچ فایلی انتخاب نشده است";
+    private string? _previewImage;
+
+
+    #endregion
+
+    #region Private Methods
+
+    public void ResetFormData()
+    {
+        _previewImage = string.Empty;
+        _updateMode = false;
+        _selectedFileName = "هیچ فایلی انتخاب نشده است";
+        _currencyDTO = new();
+    }
+
+    private void updateCurrency(int currencyId)
+    {
+        _previewImage = string.Empty;
+        var selectedCurrency = _currenciesList.FirstOrDefault(c => c.CurrencyId == currencyId);
+        if (selectedCurrency == null)
+        {
+            toastService.ShowError("ارز یافت نشد.");
+            return;
+        }
+
+        if (selectedCurrency.Image != null)
+        {
+            var byteArray = selectedCurrency.Image;
+
+            string? image = ConvertByteArrayToImage(byteArray);
+            if (image == null)
+            {
+                toastService.ShowError("بارگذاری عکس با مشکل مواجه شد.");
+                return;
+            }
+            _previewImage = image;
+        }
+
+        _updateMode = true;
+        _currencyDTO = selectedCurrency;
+    }
+
+    private async void HandleCurrencyActivation(int currencyId)
+    {
+        try
+        {
+            _isDisabled = true;
+
+            var authenticatedUser = await _state;
+            var isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+            if (!isAuthenticated)
+            {
+                toastService.ShowError("شما مجاز نیستید");
+                return;
+            }
+
+            var userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+            var jwtToken = authenticatedUser.ExtractJWTFromToken();
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", jwtToken);
+
+            var url = $"api/Currency/activation/{currencyId}";
+
+            var currency = _currenciesList.FirstOrDefault(c => c.CurrencyId == currencyId);
+
+            if (currency == null)
+            {
+                toastService.ShowError("ارز مورد نظر یافت نشد");
+                return;
+            }
+
+            var currencyActivationDTO = new CurrencyActivationDTO()
+                {
+                    CurrencyId = currencyId,
+                    IsActive = !currency.IsActive,
+                    UserId = userId
+                };
+
+            var response = await _httpClient.PutAsJsonAsync(url, currencyActivationDTO);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+            if (!response.IsSuccessStatusCode || response == null)
+            {
+                toastService.ShowError(result.Message);
+                return;
+            }
+
+            if (result.Success)
+            {
+                // update currency locally
+                currency.IsActive = !currency.IsActive;
+                toastService.ShowSuccess($"ارز با موفقیت بروز رسانی شد");
+                StateHasChanged();
+            }
+            else
+            {
+                toastService.ShowError(result.Message!);
+            }
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private async Task HandleImageChange(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+
+            // ✅ Update the displayed file name
+            _selectedFileName = file.Name;
+
+            // ✅ Validate Image Size (Max 5MB)
+            if (file.Size > 5 * 1024 * 1024)
+            {
+                toastService.ShowError("حجم تصویر نباید بیشتر از 5 مگابایت باشد.");
+                _errorMessage = "حجم تصویر نباید بیشتر از 5 مگابایت باشد.";
+                _previewImage = null;
+                return;
+            }
+
+            // ✅ Read Image as Byte Array
+            using (var stream = new MemoryStream())
+            {
+                await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(stream);
+                _currencyDTO.Image = stream.ToArray();
+            }
+
+            // ✅ Generate Base64 Preview
+            _previewImage = $"data:{file.ContentType};base64,{Convert.ToBase64String(_currencyDTO.Image)}";
+
+            _errorMessage = null; // Clear error if successful
+            StateHasChanged(); // Ensure the UI updates after file selection
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError("در آپلود تصویر خطای رخ داده است");
+        }
+
+    }
+
+    private string? ConvertByteArrayToImage(byte[] byteArray)
+    {
+        try
+        {
+            // Example: Retrieving the byte array from the database (assuming you have a method to get the image)
+            // _currencyImageByteArray = await YourService.GetCurrencyImageAsync();
+
+            // For demonstration, assume _currencyImageByteArray is already populated
+            // Convert byte array to Base64 string for image preview
+            if (byteArray != null && byteArray.Length > 0)
+            {
+                return $"data:image/png;base64,{Convert.ToBase64String(byteArray)}";
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return null;
+
+        }
+    }
+
+    private async Task AddCurrency()
+    {
+        try
+        {
+            _isDisabled = true;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var url = "api/Currency";
+
+            //UserId(owner)
+            _currencyDTO.UserId = _userId;
+
+            // Add Or Update
+
+            if (_updateMode)
+            {
+                url += $"/{_currencyDTO.CurrencyId}";
+                // update currency
+                var response = await _httpClient.PutAsJsonAsync(url, _currencyDTO);
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(result.Message);
+                    return;
+                }
+
+                if (result.Success)
+                {
+                    var currency = _currenciesList.FirstOrDefault(c => c.CurrencyId == _currencyDTO.CurrencyId);
+
+                    // update currency locally
+                    currency.Name = _currencyDTO.Name;
+                    currency.Code = _currencyDTO.Code;
+                    currency.Symbol = _currencyDTO.Symbol;
+                    currency.Image = _currencyDTO.Image;
+                    currency.ImageURL = _currencyDTO.ImageURL;
+                    currency.Unit = _currencyDTO.Unit;
+
+                    ResetFormData();
+
+                    toastService.ShowSuccess($"ارز با موفقیت بروز رسانی شد");
+                    StateHasChanged();
+                }
+                else
+                {
+                    toastService.ShowError(result.Message!);
+                }
+            }
+            else
+            {
+                // add curreny
+                var response = await _httpClient.PostAsJsonAsync(url, _currencyDTO);
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+                if (!response.IsSuccessStatusCode || response == null)
+                {
+                    toastService.ShowError(result.Message);
+                    return;
+                }
+
+                if (result.Success)
+                {
+                    var newAddedCurrencyId = result.Data;
+
+                    _currencyDTO.CurrencyId = newAddedCurrencyId;
+
+                    _currenciesList.Add(_currencyDTO);
+
+                    ResetFormData();
+
+                    toastService.ShowSuccess($"ارز با موفقیت ثبت شد");
+
+                    StateHasChanged();
+                }
+                else
+                {
+                    toastService.ShowError(result.Message!);
+                }
+            }
+
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _isDisabled = false;
+        }
+    }
+
+    private async Task FetchCurrencies()
+    {
+        try
+        {
+            _loadingCurrencies = true;
+
+            // var authenticatedUser = await _state;
+            // var isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+            // if (!isAuthenticated)
+            // {
+            //     toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.NotAuthenticated)]);
+            //     return;
+            // }
+
+            // var jwtToken = authenticatedUser.ExtractJWTFromToken();
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.
+            AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            // Fetch All currencies
+
+            string url = $"api/Currency";
+
+            var response = await _httpClient.GetFromJsonAsync<ApiResponse<IEnumerable<CurrencyDTO>>>(url);
+            if (response == null || !response.Success)
+            {
+                toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.FailedToLoadCurrencies)]);
+                return;
+            }
+            _currenciesList = response.Data.ToList();
+        }
+        catch (Exception ex)
+        {
+            toastService.ShowError(Helper.ErrorsDictionary[nameof(ErrorList.ServerError)]);
+        }
+        finally
+        {
+            _loadingCurrencies = false;
+        }
+    }
+
+    #endregion
+
+    #region Life Cycles
+
+    private int _userId { get; set; }
+
+    private string? _jwtToken { get; set; }
+
+    private bool _isAuthenticated { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticatedUser = await _state;
+        _isAuthenticated = authenticatedUser.User.Identity.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            _initialLoading = false; // Set this early
+            StateHasChanged(); // Force UI update
+            return;
+        }
+        _userId = int.Parse(authenticatedUser.ExtractUserIdFromToken());
+        _jwtToken = authenticatedUser.ExtractJWTFromToken();
+        await FetchCurrencies();
+    }
+
+    #endregion
+}

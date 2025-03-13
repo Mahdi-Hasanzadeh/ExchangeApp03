@@ -1,0 +1,51 @@
+﻿@if (CustomerList != null && CustomerList.Count() != 0)
+{
+    <InputSelect disabled="@IsDisabled" @bind-Value="selectedValue"
+                 class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="0">@Content</option>
+        @foreach (var customer in CustomerList.Values)
+        {
+            <option @key="customer.CustomerId" value="@customer.CustomerId">@customer.CustomerName-@customer.AccountNumber</option>
+        }
+    </InputSelect>
+}
+
+@code {
+    [Parameter]
+    public bool IsDisabled { get; set; } = false;
+    [Parameter]
+    public string Content { get; set; } = "شماره حساب را انتخاب کنید.";
+
+    [Parameter]
+    public int BindValueTo { get; set; } // This holds the parent value
+
+    [Parameter]
+    public EventCallback<int> BindValueToChanged { get; set; } // Required for two-way binding
+
+    [Parameter]
+    public Dictionary<int, CustomerAccountSummaryDTO> CustomerList { get; set; } = new();
+
+    private bool _loading { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> _state { get; set; }
+
+    private int selectedValue
+    {
+        get => BindValueTo;
+        set
+        {
+            if (BindValueTo != value)
+            {
+                BindValueTo = value;
+                BindValueToChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private async Task OnValueChanged(ChangeEventArgs e)
+    {
+        selectedValue = int.Parse(e.Value.ToString());
+        await BindValueToChanged.InvokeAsync(selectedValue); // Notify parent about the change
+    }
+}
